@@ -1,0 +1,22 @@
+# Cursor / Windsurf AI Rules for Axiom & SCORE Engine
+
+You are pair-programming on **Axiom**, a production-grade Agentic RAG platform powered by the **SCORE Engine** (*Self-COrrecting Reasoning Engine*).
+
+## Core Principles
+1. **Epistemic Humility**: Never write prompts or code that hallucinate or bluff. If facts are absent in context, the system must cleanly state its limits.
+2. **Never Bypass Graders**: Every retrieved chunk must pass `DocGrader` before `AnswerGenerator`. Every answer must pass `HallucinationGrader`.
+3. **Strict Typing**: All nodes use `AgentState` (`src/axiom/core/state.py`). Never use untyped dictionaries.
+4. **Decoupled Prompts**: Keep prompts in `src/axiom/core/prompts/`. Never hardcode prompts inside Python node functions.
+5. **Loop Ceiling**: Enforce `loop_count <= 3` at all times.
+6. **Preserve Tables**: Chunking and ingestion must preserve Markdown tables and link footnotes.
+
+## Key Technologies
+- Language: Python 3.10+
+- Orchestration: LangGraph (`langgraph`)
+- API: FastAPI with Server-Sent Events (`sse-starlette`)
+- Retrieval: Hybrid (Dense + BM25) with Cross-Encoder Re-ranker
+- Vector Store: Qdrant / Chroma
+- Evaluation: Ragas / DeepEval
+- Linter: Ruff
+
+For complete architectural decisions, read `DECISIONS.md`, `TECH_STACK.md`, and `CONTEXT.md`.
