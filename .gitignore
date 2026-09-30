@@ -1,1 +1,13 @@
+# Add the files you want Git to skip:
+AGENTS.md
+AXIOM_FOUNDATION.md
+AXIOM_FOUNDATION_v1.md
+Agentic_RAG_Foundation.md
+Agentic_RAG_Foundation_v1.md
+CONTEXT.md
+CONTRIBUTING.md
+DECISIONS.md
+SCALING_ARCHITECTURE.md
+TECH_STACK.md
 TODO.md
+docs/
