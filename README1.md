@@ -1,4 +1,7 @@
-<<<<<<< HEAD
+
+
+
+
 <div align="center">
 
 # ⚡ AXIOM
@@ -154,7 +157,3 @@ LANGSMITH_API_KEY=your_key_here
 * [Architectural Decisions (DECISIONS.md)](DECISIONS.md): Formal Architecture Decision Records (ADRs).
 * [Project Roadmap (ROADMAP.md)](ROADMAP.md) & [Execution Checklist (TODO.md)](TODO.md): Progress tracking.
 * [AI Assistant Rules (AGENTS.md)](AGENTS.md): Universal guide for AI pair programmers.
-=======
-# AXIOM
-Beyond Retrieval Towards Certainty
->>>>>>> ba7ba35dbbed07b0af58d8593bd9a66849d74dfc
