@@ -1,10 +1,10 @@
-# Project Roadmap: Axiom & SCORE Engine
+﻿# Project Roadmap: Axiom & SCORE Engine
 
 > **Mission**: Build, benchmark, and deploy a production-grade, zero-hallucination agentic RAG platform for high-stakes enterprise data.
 
 ---
 
-## 🗺️ High-Level Milestone Overview
+## ðŸ—ºï¸ High-Level Milestone Overview
 
 ```mermaid
 gantt
@@ -36,7 +36,7 @@ gantt
 
 ---
 
-## 📌 Phase Breakdown
+## ðŸ“Œ Phase Breakdown
 
 ### Phase 1: Foundation & Specifications `[COMPLETED]`
 - [x] Lock in Brand Identity (**Axiom**) and Engine Name (**SCORE**).
@@ -45,30 +45,28 @@ gantt
 - [x] Document Domain Context (`CONTEXT.md`) and Technical Justifications (`TECH_STACK.md`).
 - [x] Establish AI portability rules (`AGENTS.md`) and Architecture Decision Records (`DECISIONS.md`).
 
-### Phase 2: Scaffolding & Configuration `[CURRENT]`
-- [ ] Create production directory structure (`src/axiom/`, `tests/`, `evals/`, `deploy/`).
-- [ ] Author `pyproject.toml` with pinned dependencies (`langgraph`, `fastapi`, `pydantic-settings`, `qdrant-client`).
-- [ ] Build central configuration module (`src/axiom/config/settings.py`) with environment validation.
-- [ ] Create `.env.example` with clear instructions for API keys.
+### Phase 2: Scaffolding & Configuration `[COMPLETED]`
+- [x] Create production directory structure (`src/axiom/`, `tests/`, `evals/`, `deploy/`).
+- [x] Author `pyproject.toml` with pinned dependencies (`langgraph`, `fastapi`, `pydantic-settings`, `qdrant-client`).
+- [x] Build central configuration module (`src/axiom/config/settings.py`) with environment validation.
+- [x] Create `.env.example` with clear instructions for API keys.
+- [x] Initialize Python 3.13 virtual environment (`.venv`).
 
-### Phase 3: Core SCORE LangGraph Engine
-- [ ] Define immutable typed state (`src/axiom/core/state.py`).
-- [ ] Implement isolated node handlers:
-  - `router.py`: Classifies query intent (internal vector store vs web search).
-  - `grader.py`: Structured binary output relevance grader.
-  - `rewriter.py`: Query reformulation for multi-hop expansion.
-  - `generator.py`: Grounded response synthesizer with citation requirements.
-  - `hallucination_grader.py`: Grounding audit against retrieved chunks.
-  - `fallback.py`: Transparent refusal handler when retries expire.
-- [ ] Assemble and compile the LangGraph state machine with loop ceiling guard ($\le 3$).
+### Phase 3: Core SCORE LangGraph Engine `[COMPLETED]`
+- [x] Define immutable typed state (`src/axiom/core/state.py`).
+- [x] Author decoupled prompt templates in `src/axiom/core/prompts/`.
+- [x] Implement all 7 node handlers in `src/axiom/core/nodes/` (router, retriever, grader, rewriter, generator, hallucination_grader, fallback).
+- [x] Assemble and compile the cyclical LangGraph state machine with loop ceiling guard ($\le 3$) in `src/axiom/core/graph.py`.
+- [x] Author and verify unit tests in `tests/unit/test_graph.py` (100% passing).
 
-### Phase 4: Hybrid Ingestion & Retrieval Services
-- [ ] Implement markdown-preserving tabular document parser.
-- [ ] Build hybrid retriever combining dense vector embeddings and BM25 sparse index.
-- [ ] Integrate cross-encoder re-ranking service (Cohere / BGE).
-- [ ] Integrate Tavily / Google Search API as live web fallback.
+### Phase 4: Hybrid Ingestion & Retrieval Services `[COMPLETED]`
+- [x] Build multi-tenant HybridVectorStore (`src/axiom/services/vector_store.py`) combining Qdrant and BM25Plus.
+- [x] Implement Reciprocal Rank Fusion (RRF) for dense + sparse candidate merging.
+- [x] Integrate Cross-Encoder Re-ranking service (`src/axiom/services/reranker.py`) prioritizing superseding contractual terms.
+- [x] Integrate live Web Search fallback service (`src/axiom/services/web_search.py`).
+- [x] Pass automated unit tests for multi-tenant isolation, exact clause retrieval, and re-ranking.
 
-### Phase 5: FastAPI Gateway & Real-Time SSE Streaming
+### Phase 5: FastAPI Gateway & Real-Time SSE Streaming `[CURRENT]`
 - [ ] Setup FastAPI application factory with CORS and health probes.
 - [ ] Implement `POST /api/v1/query` endpoint with Server-Sent Events (SSE).
 - [ ] Stream real-time graph state events (`status`) alongside incremental tokens (`token`).
@@ -85,3 +83,6 @@ gantt
 - [ ] Display real-time step visualization (Node activations, discarded chunks, verified citations).
 - [ ] Configure Redis / PostgreSQL persistent checkpointer (`AsyncPostgresSaver`).
 - [ ] Author `docker-compose.yml` for zero-friction local orchestration.
+
+
+
