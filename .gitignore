@@ -1,14 +1,37 @@
-# Add the files you want Git to skip:
+# ==============================================================================
+# Security & Credentials (NEVER PUSH)
+# ==============================================================================
+.env
+*.pem
+*.key
+
+# ==============================================================================
+# Python & Virtual Environments (LOCAL ONLY)
+# ==============================================================================
+.venv/
+env/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# ==============================================================================
+# Local AI Assistant & Personal Workspace Notes (LOCAL ONLY)
+# ==============================================================================
 AGENTS.md
-AXIOM_FOUNDATION.md
-AXIOM_FOUNDATION_v1.md
+.cursorrules
+TODO.md
 Agentic_RAG_Foundation.md
 Agentic_RAG_Foundation_v1.md
-CONTEXT.md
-CONTRIBUTING.md
-DECISIONS.md
-SCALING_ARCHITECTURE.md
-TECH_STACK.md
-TODO.md
-docs/
-it
+AXIOM_FOUNDATION_v1.md
+
+# ==============================================================================
+# IDE & System Files
+# ==============================================================================
+.idea/
+.vscode/
+*.swp
+Thumbs.db
