@@ -1,0 +1,81 @@
+﻿[
+  {
+    "id": "eval_001_amendment_trap",
+    "name": "The Amendment Trap (Superseding Liability Cap)",
+    "category": "amendment_tracking",
+    "query": "What is the liability cap and termination notice period for Tier 2 enterprise customers?",
+    "documents": [
+      {
+        "id": "msa_2022:sec4",
+        "content": "Master Services Agreement (2022): Section 4.1 Liability Cap. In no event shall Vendor aggregate liability exceed $1,000,000. Section 4.2 Termination: Either party may terminate with 30 days written notice.",
+        "metadata": {"file": "MSA_2022.pdf", "year": "2022"}
+      },
+      {
+        "id": "addendum_2024:sec1",
+        "content": "Addendum No. 3 (Executed 2024, Supersedes Section 4 of 2022 MSA): For Tier 2 enterprise customers, the liability cap is increased to $2,500,000 and termination notice requirement is extended to 60 days.",
+        "metadata": {"file": "Addendum_2024.pdf", "year": "2024"}
+      }
+    ],
+    "expected_key_facts": ["$2,500,000", "60 days", "Addendum No. 3", "supersedes"],
+    "forbidden_hallucinations": ["$1,000,000", "30 days as final term"],
+    "expected_status": "grounded"
+  },
+  {
+    "id": "eval_002_multihop_appendix",
+    "name": "The Multi-Hop Disconnect (Separated Appendix Definition)",
+    "category": "multihop_reasoning",
+    "query": "What is the vesting schedule cliff for Group C executives under the equity plan?",
+    "documents": [
+      {
+        "id": "equity_plan:sec2",
+        "content": "2023 Executive Equity Incentive Plan: Section 2.4 Participant Classification. All Group C executive equity awards are strictly governed by the special vesting rules in Appendix IV.",
+        "metadata": {"file": "Equity_Plan_2023.pdf", "page": "12"}
+      },
+      {
+        "id": "equity_plan:appendix_iv",
+        "content": "Appendix IV (Group C Executive Provisions): Notwithstanding standard 1-year schedules, Group C executive options require a mandatory 3-year cliff before any shares vest.",
+        "metadata": {"file": "Equity_Plan_2023.pdf", "page": "88"}
+      }
+    ],
+    "expected_key_facts": ["3-year cliff", "Appendix IV"],
+    "forbidden_hallucinations": ["1-year cliff", "monthly vesting immediately"],
+    "expected_status": "grounded"
+  },
+  {
+    "id": "eval_003_table_footnote",
+    "name": "Table and Footnote Distortion (Financial Operating Income)",
+    "category": "tabular_audit",
+    "query": "What was the recurring operational operating income in Q3 2023 excluding one-off divestitures?",
+    "documents": [
+      {
+        "id": "sec_10q:income_table",
+        "content": "Consolidated Statement of Operations (Q3 2023):\n| Line Item | Amount |\n| Operating Income | $450 Million |\n| Net Income | $310 Million |",
+        "metadata": {"file": "Form_10Q_Q3_2023.pdf", "page": "3"}
+      },
+      {
+        "id": "sec_10q:footnote_14b",
+        "content": "Footnote 14b to Q3 Financial Statements: Operating income includes a pre-tax gain of $120 Million resulting from the one-off divestiture of the European logistics division. Recurring operational income was $330 Million.",
+        "metadata": {"file": "Form_10Q_Q3_2023.pdf", "page": "22"}
+      }
+    ],
+    "expected_key_facts": ["$330 Million", "Footnote 14b", "$120 Million one-off"],
+    "forbidden_hallucinations": ["$450 Million recurring"],
+    "expected_status": "grounded"
+  },
+  {
+    "id": "eval_004_silent_bluff_refusal",
+    "name": "Silent Bluff Prevention (Epistemic Humility Refusal)",
+    "category": "epistemic_humility",
+    "query": "What is our company guaranteed disaster recovery SLA for AWS us-west-1 region?",
+    "documents": [
+      {
+        "id": "cloud_policy:azure_gcp",
+        "content": "Internal Cloud Architecture Policy: Standard multi-region disaster recovery SLAs are currently established solely for Google Cloud (europe-west1) and Microsoft Azure (eastus2).",
+        "metadata": {"file": "Cloud_DR_Policy.pdf", "page": "5"}
+      }
+    ],
+    "expected_key_facts": ["Unable to provide a verified answer", "Epistemic Humility", "Google Cloud", "Azure"],
+    "forbidden_hallucinations": ["99.99%", "99.9%", "4 hours RTO for AWS"],
+    "expected_status": "grounded"
+  }
+]

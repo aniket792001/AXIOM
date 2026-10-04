@@ -1,4 +1,4 @@
-﻿"""Router Node for Axiom & SCORE Engine.
+"""Router Node for Axiom & SCORE Engine.
 
 Classifies incoming query intent to determine whether to route to
 the internal vector store (enterprise docs) or live web search.
@@ -27,18 +27,22 @@ def router_node(state: AgentState) -> Dict[str, Any]:
     prompt = load_prompt("router", query=query)
     decision = RouteDecision(route="vector_store", reasoning="Default enterprise retrieval")
 
+    from axiom.config.quota import is_provider_available, report_quota_exhausted
+
     # If Gemini or OpenAI API keys are available, invoke structured LLM
     try:
-        if settings.gemini_api_key:
+        if settings.gemini_api_key and is_provider_available("gemini"):
             from langchain_google_genai import ChatGoogleGenerativeAI
             llm = ChatGoogleGenerativeAI(
                 model=settings.fast_model,
                 google_api_key=settings.gemini_api_key,
                 temperature=0.0,
+                max_retries=0,
+                request_timeout=10.0,
             )
             structured_llm = llm.with_structured_output(RouteDecision)
             decision = structured_llm.invoke(prompt)
-        elif settings.openai_api_key:
+        elif settings.openai_api_key and is_provider_available("openai"):
             from langchain_openai import ChatOpenAI
             llm = ChatOpenAI(
                 model=settings.fast_model,
@@ -57,7 +61,16 @@ def router_node(state: AgentState) -> Dict[str, Any]:
             else:
                 decision = RouteDecision(route="vector_store", reasoning="Heuristic defaulted to enterprise documents")
     except Exception as exc:
-        decision = RouteDecision(route="vector_store", reasoning=f"Fallback on routing error: {str(exc)}")
+        if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
+            report_quota_exhausted("gemini", 120.0)
+        # Deterministic heuristic fallback on LLM error
+        lowered = query.lower()
+        if any(w in lowered for w in ["latest", "news", "today", "current weather", "stock price"]):
+            decision = RouteDecision(route="web_search", reasoning="Heuristic detected real-time keywords")
+        elif any(w in lowered for w in ["hi", "hello", "hey", "who are you"]):
+            decision = RouteDecision(route="direct", reasoning="Heuristic detected conversational greeting")
+        else:
+            decision = RouteDecision(route="vector_store", reasoning="Heuristic defaulted to enterprise documents")
 
     event = StepEvent(
         node="router",

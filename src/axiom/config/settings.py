@@ -1,4 +1,4 @@
-﻿"""Axiom & SCORE Configuration Module.
+"""Axiom & SCORE Configuration Module.
 
 Type-safe settings management using Pydantic Settings v2.
 Loads environment variables from .env file or system environment.
@@ -33,11 +33,11 @@ class Settings(BaseSettings):
 
     # Model Tiering
     fast_model: str = Field(
-        default="gemini-1.5-flash",
+        default="gemini-flash-latest",
         description="Fast model for routing, grading, and self-correction loops",
     )
     reasoning_model: str = Field(
-        default="gemini-1.5-pro",
+        default="gemini-flash-latest",
         description="High-reasoning model for citation-grounded synthesis",
     )
 

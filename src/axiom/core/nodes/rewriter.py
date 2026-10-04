@@ -1,4 +1,4 @@
-﻿"""Query Rewriter Node for Axiom & SCORE Engine.
+"""Query Rewriter Node for Axiom & SCORE Engine.
 
 Reformulates and expands search queries when retrieved context
 is insufficient, missing superseding amendments, or lacking definitions.
@@ -36,13 +36,17 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
     new_query = f"{original_query} addendum amendment"
     strategy = "Keyword expansion fallback"
 
+    from axiom.config.quota import is_provider_available, report_quota_exhausted
+
     try:
-        if settings.gemini_api_key:
+        if settings.gemini_api_key and is_provider_available("gemini"):
             from langchain_google_genai import ChatGoogleGenerativeAI
             llm = ChatGoogleGenerativeAI(
                 model=settings.fast_model,
                 google_api_key=settings.gemini_api_key,
                 temperature=0.0,
+                max_retries=0,
+                request_timeout=10.0,
             ).with_structured_output(RewriteOutput)
             result = llm.invoke(prompt)
             new_query = result.rewritten_query

@@ -1,4 +1,4 @@
-﻿"""Hallucination Grader Node for Axiom & SCORE Engine.
+"""Hallucination Grader Node for Axiom & SCORE Engine.
 
 Strictly audits generated responses against source context.
 Detects ungrounded assertions or numbers invented outside verified documents.
@@ -30,16 +30,20 @@ def hallucination_grader_node(state: AgentState) -> Dict[str, Any]:
 
     audit = HallucinationAudit(binary_score="grounded", reasoning="Default grounded verdict")
 
+    from axiom.config.quota import is_provider_available, report_quota_exhausted
+
     try:
-        if settings.gemini_api_key:
+        if settings.gemini_api_key and is_provider_available("gemini"):
             from langchain_google_genai import ChatGoogleGenerativeAI
             llm = ChatGoogleGenerativeAI(
                 model=settings.fast_model,
                 google_api_key=settings.gemini_api_key,
                 temperature=0.0,
+                max_retries=0,
+                request_timeout=10.0,
             ).with_structured_output(HallucinationAudit)
             audit = llm.invoke(prompt)
-        elif settings.openai_api_key:
+        elif settings.openai_api_key and is_provider_available("openai"):
             from langchain_openai import ChatOpenAI
             llm = ChatOpenAI(
                 model=settings.fast_model,
@@ -55,6 +59,8 @@ def hallucination_grader_node(state: AgentState) -> Dict[str, Any]:
                 reasoning="Deterministic test check passed; facts correspond to context",
             )
     except Exception as exc:
+        if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
+            report_quota_exhausted("gemini", 120.0)
         audit = HallucinationAudit(binary_score="grounded", reasoning=f"Audit fallback: {str(exc)}")
 
     event = StepEvent(

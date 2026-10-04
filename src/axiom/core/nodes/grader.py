@@ -1,4 +1,4 @@
-﻿"""Document Grader Node for Axiom & SCORE Engine.
+"""Document Grader Node for Axiom & SCORE Engine.
 
 Evaluates retrieved chunks for relevance to the user query.
 Filters out noisy, irrelevant context before generation.
@@ -27,21 +27,30 @@ def grader_node(state: AgentState) -> Dict[str, Any]:
     graded_chunks: List[DocumentChunk] = []
     discarded_count = 0
 
+    from axiom.config.quota import is_provider_available, report_quota_exhausted
+
     llm = None
-    if settings.gemini_api_key:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        llm = ChatGoogleGenerativeAI(
-            model=settings.fast_model,
-            google_api_key=settings.gemini_api_key,
-            temperature=0.0,
-        ).with_structured_output(GradeResult)
-    elif settings.openai_api_key:
-        from langchain_openai import ChatOpenAI
-        llm = ChatOpenAI(
-            model=settings.fast_model,
-            api_key=settings.openai_api_key,
-            temperature=0.0,
-        ).with_structured_output(GradeResult)
+    try:
+        if settings.gemini_api_key and is_provider_available("gemini"):
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            llm = ChatGoogleGenerativeAI(
+                model=settings.fast_model,
+                google_api_key=settings.gemini_api_key,
+                temperature=0.0,
+                max_retries=0,
+                request_timeout=10.0,
+            ).with_structured_output(GradeResult)
+        elif settings.openai_api_key and is_provider_available("openai"):
+            from langchain_openai import ChatOpenAI
+            llm = ChatOpenAI(
+                model=settings.fast_model,
+                api_key=settings.openai_api_key,
+                temperature=0.0,
+            ).with_structured_output(GradeResult)
+    except Exception as exc:
+        if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
+            report_quota_exhausted("gemini", 120.0)
+        llm = None
 
     for doc in documents:
         score = "yes"
@@ -50,12 +59,18 @@ def grader_node(state: AgentState) -> Dict[str, Any]:
                 prompt = load_prompt("grader", query=query, chunk_id=doc.id, content=doc.content)
                 result: GradeResult = llm.invoke(prompt)
                 score = result.binary_score.lower().strip()
-            except Exception:
-                score = "yes"  # Fallback: retain on grading exception
+            except Exception as exc:
+                if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
+                    report_quota_exhausted("gemini", 120.0)
+                # Fallback on LLM network exception: use keyword overlap
+                query_words = set(w.strip("?.,!") for w in query.lower().split() if len(w) > 2)
+                content_words = set(w.strip("?.,!") for w in doc.content.lower().split() if len(w) > 2)
+                overlap = query_words.intersection(content_words)
+                score = "yes" if len(overlap) >= 1 else "no"
         else:
             # Deterministic heuristic grading in key-free test mode
-            query_words = set(query.lower().split())
-            content_words = set(doc.content.lower().split())
+            query_words = set(w.strip("?.,!") for w in query.lower().split() if len(w) > 2)
+            content_words = set(w.strip("?.,!") for w in doc.content.lower().split() if len(w) > 2)
             overlap = query_words.intersection(content_words)
             score = "yes" if len(overlap) >= 1 else "no"
 

@@ -1,0 +1,143 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Axiom | Zero-Hallucination Agentic RAG Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+  <!-- Top Sticky Navigation -->
+  <header>
+    <div class="nav-container">
+      <div class="brand-wrapper">
+        <div class="brand-logo">A</div>
+        <div class="brand-title">AXIOM</div>
+        <div class="brand-badge">SCORE ENGINE v1.0</div>
+      </div>
+      <div class="nav-actions">
+        <div class="tagline">Beyond Retrieval. Towards Certainty.</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Application Body -->
+  <main>
+
+    <!-- SCORE Real-Time Agent Pipeline Visualizer -->
+    <section class="pipeline-card" aria-label="Pipeline Status Visualizer">
+      <div class="pipeline-header">
+        <div class="pipeline-title">
+          <span>⚡ SCORE Active State Machine</span>
+        </div>
+        <div id="pipeline-status-badge" style="font-family: var(--font-code); font-size: 12px; color: var(--accent-ai);">
+          Ready
+        </div>
+      </div>
+      <div class="pipeline-steps">
+        <div class="step-node" id="node-router">
+          <div class="step-number">01. ROUTER</div>
+          <div class="step-name">Intent Classifier</div>
+          <div class="step-status" id="status-router">Idle</div>
+        </div>
+        <div class="step-node" id="node-retriever">
+          <div class="step-number">02. RETRIEVAL</div>
+          <div class="step-name">Hybrid Qdrant + BM25</div>
+          <div class="step-status" id="status-retriever">Idle</div>
+        </div>
+        <div class="step-node" id="node-grader">
+          <div class="step-number">03. GRADER</div>
+          <div class="step-name">Relevance Filter</div>
+          <div class="step-status" id="status-grader">Idle</div>
+        </div>
+        <div class="step-node" id="node-generator">
+          <div class="step-number">04. GENERATOR</div>
+          <div class="step-name">Grounded Synthesis</div>
+          <div class="step-status" id="status-generator">Idle</div>
+        </div>
+        <div class="step-node" id="node-hallucination">
+          <div class="step-number">05. AUDIT</div>
+          <div class="step-name">Zero-Hallucination</div>
+          <div class="step-status" id="status-hallucination">Idle</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Query Box & Benchmark Presets -->
+    <section class="query-card" aria-label="Query Interface">
+      <div class="preset-container">
+        <button class="preset-btn" data-query="What is the liability cap and termination notice period for Tier 2 enterprise customers?">
+          🎯 Test Amendment Trap (2022 vs 2024)
+        </button>
+        <button class="preset-btn" data-query="What is the vesting schedule cliff for Group C executives under the equity plan?">
+          📑 Test Multi-Hop Appendix IV
+        </button>
+        <button class="preset-btn" data-query="What was the recurring operational operating income in Q3 2023 excluding one-off divestitures?">
+          📊 Test Table Footnote 14b
+        </button>
+        <button class="preset-btn" data-query="What is our company guaranteed disaster recovery SLA for AWS us-west-1 region?">
+          🛡️ Test Silent Bluff Refusal
+        </button>
+      </div>
+
+      <form id="query-form" class="input-group">
+        <input 
+          type="text" 
+          id="query-input" 
+          class="query-input" 
+          placeholder="Ask a mission-critical question over enterprise contracts or filings..." 
+          autocomplete="off"
+          required
+        />
+        <button type="submit" id="submit-btn" class="submit-btn">
+          <span>Run SCORE</span>
+          <span>→</span>
+        </button>
+      </form>
+    </section>
+
+    <!-- Response & Citation Inspection Grid -->
+    <section class="results-container">
+      <div class="response-card">
+        <div class="section-label">
+          <span>Grounded Synthesis</span>
+          <span id="verdict-tag" class="verdict-tag grounded" style="display: none;">Verified Grounded</span>
+        </div>
+        <div id="response-output" class="response-text">
+          Select a benchmark preset above or enter a contract question to watch the SCORE engine execute its self-correcting reasoning loops in real time.
+        </div>
+      </div>
+
+      <div class="citations-card">
+        <div class="section-label">
+          <span>Verified Citations</span>
+          <span id="citation-count" style="font-family: var(--font-code); color: var(--accent-ai);">0 Sources</span>
+        </div>
+        <div id="citations-list" class="citation-list">
+          <div style="font-size: 13px; color: var(--text-muted); font-style: italic;">
+            Deterministic citations linking assertions to exact chunk IDs will appear here.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Real-time Agent Diagnostic Event Stream -->
+    <section class="diagnostics-card" aria-label="System Diagnostics">
+      <div id="diagnostics-log">
+        <div class="log-entry">
+          <span class="log-time">[SYSTEM]</span>
+          <span class="log-node">Axiom v0.1.0</span>
+          <span class="log-msg">State machine initialized. Multi-tenant hybrid vector store ready.</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

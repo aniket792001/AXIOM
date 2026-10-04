@@ -51,6 +51,7 @@ dependencies = [
     "pydantic>=2.9.0",
     "pydantic-settings>=2.5.0",
     "python-multipart>=0.0.12",
+    "aiofiles>=24.1.0",
 
     # Hybrid Search, Vector Stores & Re-ranking
     "qdrant-client>=1.11.0",

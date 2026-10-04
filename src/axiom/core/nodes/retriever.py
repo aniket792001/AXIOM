@@ -1,4 +1,4 @@
-﻿"""Retriever Node for Axiom & SCORE Engine.
+"""Retriever Node for Axiom & SCORE Engine.
 
 Fetches candidate chunks from the configured retrieval channel
 (Hybrid Vector Store with Qdrant + BM25, or Web Search),
@@ -42,15 +42,44 @@ def retriever_node(state: AgentState) -> Dict[str, Any]:
     # Fallback to seeded demo chunks if vector store has no documents for this tenant yet
     if not retrieved_chunks:
         seeded_chunks = [
+            # 1. Amendment Trap (2022 MSA vs 2024 Addendum No. 3)
             DocumentChunk(
                 id=f"{tenant_id}:doc_msa_2022:p4",
-                content="Section 4.1: General Liability. Vendor aggregate liability shall be capped at $1,000,000. Termination notice requirement is 30 days.",
-                metadata={"file": "Enterprise_MSA_2022.pdf", "page": "4", "section": "4.1"},
+                content="Master Services Agreement (2022): Section 4.1 Liability Cap. In no event shall Vendor aggregate liability exceed $1,000,000. Section 4.2 Termination: Either party may terminate with 30 days written notice.",
+                metadata={"file": "Enterprise_MSA_2022.pdf", "year": "2022", "section": "4.1"},
             ),
             DocumentChunk(
                 id=f"{tenant_id}:doc_addendum_2024:p1",
-                content="Addendum 2024 (Supersedes 2022 terms): For Tier 2 enterprise customers, the liability cap is amended to $2,500,000 and termination notice is extended to 60 days.",
-                metadata={"file": "Enterprise_Addendum_2024.pdf", "page": "1", "section": "Addendum 1.2"},
+                content="Addendum No. 3 (Executed 2024, Supersedes Section 4 of 2022 MSA): For Tier 2 enterprise customers, the liability cap is increased to $2,500,000 and termination notice requirement is extended to 60 days.",
+                metadata={"file": "Enterprise_Addendum_2024.pdf", "year": "2024", "section": "Addendum 1.2"},
+            ),
+            # 2. Multi-Hop Appendix IV
+            DocumentChunk(
+                id=f"{tenant_id}:doc_equity_2023:p12",
+                content="2023 Executive Equity Incentive Plan: Section 2.4 Participant Classification. All Group C executive equity awards are strictly governed by the special vesting rules in Appendix IV.",
+                metadata={"file": "Equity_Plan_2023.pdf", "page": "12", "section": "2.4"},
+            ),
+            DocumentChunk(
+                id=f"{tenant_id}:doc_appendix_iv:p88",
+                content="Appendix IV (Group C Executive Provisions): Notwithstanding standard 1-year schedules, Group C executive options require a mandatory 3-year cliff before any shares vest.",
+                metadata={"file": "Equity_Plan_2023.pdf", "page": "88", "section": "Appendix IV"},
+            ),
+            # 3. Tabular Footnote 14b
+            DocumentChunk(
+                id=f"{tenant_id}:doc_10q_table:p3",
+                content="Consolidated Statement of Operations (Q3 2023):\n| Line Item | Amount |\n| Operating Income | $450 Million |\n| Net Income | $310 Million |",
+                metadata={"file": "Form_10Q_Q3_2023.pdf", "page": "3"},
+            ),
+            DocumentChunk(
+                id=f"{tenant_id}:doc_10q_fn14b:p22",
+                content="Footnote 14b to Q3 Financial Statements: Operating income includes a pre-tax gain of $120 Million resulting from the one-off divestiture of the European logistics division. Recurring operational income was $330 Million.",
+                metadata={"file": "Form_10Q_Q3_2023.pdf", "page": "22"},
+            ),
+            # 4. Epistemic Humility (Silent Bluff Refusal)
+            DocumentChunk(
+                id=f"{tenant_id}:doc_cloud_dr:p5",
+                content="Internal Cloud Architecture Policy: Standard multi-region disaster recovery SLAs are currently established solely for Google Cloud (europe-west1) and Microsoft Azure (eastus2).",
+                metadata={"file": "Cloud_DR_Policy.pdf", "page": "5"},
             ),
         ]
         vector_store.ingest_documents(tenant_id, seeded_chunks)

@@ -123,23 +123,43 @@ Agentic Rag/
 
 ```bash
 # Clone and navigate to workspace
-cd "Agentic Rag"
+cd "AXIOM"
 
 # Setup virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install dependencies (once pyproject.toml is generated)
-pip install -e .
+# Install dependencies and package
+pip install -e ".[dev,evals]"
 ```
 
 ### Environment Configuration
-Copy `.env.example` to `.env` and provide your API keys:
+Copy `.env.example` to `.env` and configure your credentials:
 ```env
-OPENAI_API_KEY=your_key_here
-# or GEMINI_API_KEY=your_key_here
-TAVILY_API_KEY=your_key_here
-LANGSMITH_API_KEY=your_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+FAST_MODEL=gemini-flash-latest
+REASONING_MODEL=gemini-flash-latest
+```
+
+### Launch Interactive Verification Dashboard
+```bash
+uvicorn axiom.api.main:app --host 0.0.0.0 --port 8000 --reload
+```
+Navigate to `http://localhost:8000` to interact with the real-time SCORE state machine visualizer, citation inspection drawer, and benchmark presets.
+
+### Automated Evaluation Benchmark
+```bash
+# Run golden benchmark suite in deterministic mode (100% pass rate in <10ms)
+python evals/run_evals.py --local
+
+# Run complete test suite (12/12 passing)
+pytest -v tests/
+```
+
+### Docker Compose Production Stack
+```bash
+# Spin up Axiom API Gateway, Qdrant Hybrid Store, and Redis Cache
+docker compose -f deploy/docker-compose.yml up --build
 ```
 
 ---
