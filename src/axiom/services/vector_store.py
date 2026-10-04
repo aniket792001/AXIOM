@@ -1,4 +1,4 @@
-﻿"""Multi-Tenant Hybrid Vector Store for Axiom & SCORE Engine.
+"""Multi-Tenant Hybrid Vector Store for Axiom & SCORE Engine.
 
 Combines Dense Vector Search (Qdrant) + Sparse Keyword Search (BM25Plus)
 using Reciprocal Rank Fusion (RRF). Guarantees tenant data isolation.
@@ -71,7 +71,9 @@ class HybridVectorStore:
 
     def _get_embedding(self, text: str) -> List[float]:
         """Compute embedding vector using configured provider or mock fallback."""
-        if self.settings.gemini_api_key:
+        from axiom.config.quota import is_provider_available, report_quota_exhausted
+
+        if self.settings.gemini_api_key and is_provider_available("gemini"):
             try:
                 from langchain_google_genai import GoogleGenerativeAIEmbeddings
                 embedder = GoogleGenerativeAIEmbeddings(
@@ -80,7 +82,7 @@ class HybridVectorStore:
                 )
                 return embedder.embed_query(text)
             except Exception:
-                pass
+                report_quota_exhausted("gemini", 300.0)
         return _deterministic_mock_embedding(text, self._dim)
 
     def ingest_documents(self, tenant_id: str, chunks: List[DocumentChunk]) -> int:

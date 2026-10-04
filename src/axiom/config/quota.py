@@ -16,11 +16,17 @@ def is_provider_available(provider: str = "gemini") -> bool:
     return time.time() >= cooldown_until
 
 
-def report_quota_exhausted(provider: str = "gemini", cooldown_seconds: float = 60.0) -> None:
-    """Mark a provider as quota-exhausted for a cooldown window (default 60s)."""
+def report_quota_exhausted(provider: str = "gemini", cooldown_seconds: float = 300.0) -> None:
+    """Mark a provider as unavailable for a cooldown window (default 300s / 5min)."""
+    _quota_cooldowns[provider] = time.time() + cooldown_seconds
+
+
+def report_provider_error(provider: str = "gemini", cooldown_seconds: float = 300.0) -> None:
+    """Alias for report_quota_exhausted."""
     _quota_cooldowns[provider] = time.time() + cooldown_seconds
 
 
 def clear_quota_cooldown(provider: str = "gemini") -> None:
     """Clear cooldown to allow immediate retry."""
     _quota_cooldowns.pop(provider, None)
+

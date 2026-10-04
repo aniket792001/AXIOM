@@ -61,8 +61,7 @@ def router_node(state: AgentState) -> Dict[str, Any]:
             else:
                 decision = RouteDecision(route="vector_store", reasoning="Heuristic defaulted to enterprise documents")
     except Exception as exc:
-        if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
-            report_quota_exhausted("gemini", 120.0)
+        report_quota_exhausted("gemini", 300.0)
         # Deterministic heuristic fallback on LLM error
         lowered = query.lower()
         if any(w in lowered for w in ["latest", "news", "today", "current weather", "stock price"]):

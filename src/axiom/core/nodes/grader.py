@@ -48,20 +48,19 @@ def grader_node(state: AgentState) -> Dict[str, Any]:
                 temperature=0.0,
             ).with_structured_output(GradeResult)
     except Exception as exc:
-        if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
-            report_quota_exhausted("gemini", 120.0)
+        report_quota_exhausted("gemini", 300.0)
         llm = None
 
     for doc in documents:
         score = "yes"
-        if llm:
+        if llm and is_provider_available("gemini"):
             try:
                 prompt = load_prompt("grader", query=query, chunk_id=doc.id, content=doc.content)
                 result: GradeResult = llm.invoke(prompt)
                 score = result.binary_score.lower().strip()
             except Exception as exc:
-                if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
-                    report_quota_exhausted("gemini", 120.0)
+                report_quota_exhausted("gemini", 300.0)
+                llm = None
                 # Fallback on LLM network exception: use keyword overlap
                 query_words = set(w.strip("?.,!") for w in query.lower().split() if len(w) > 2)
                 content_words = set(w.strip("?.,!") for w in doc.content.lower().split() if len(w) > 2)

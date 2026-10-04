@@ -75,8 +75,8 @@ async def query_streaming(payload: QueryRequest) -> EventSourceResponse:
         await asyncio.sleep(0.01)
 
         try:
-            # 2. Stream LangGraph node transitions
-            for update in graph.stream(initial_state, stream_mode="updates"):
+            # 2. Stream LangGraph node transitions asynchronously
+            async for update in graph.astream(initial_state, stream_mode="updates"):
                 for node_name, node_output in update.items():
                     # Extract last step event details if available
                     details: Dict[str, Any] = {}

@@ -59,8 +59,7 @@ def hallucination_grader_node(state: AgentState) -> Dict[str, Any]:
                 reasoning="Deterministic test check passed; facts correspond to context",
             )
     except Exception as exc:
-        if "RESOURCE_EXHAUSTED" in str(exc) or "429" in str(exc):
-            report_quota_exhausted("gemini", 120.0)
+        report_quota_exhausted("gemini", 300.0)
         audit = HallucinationAudit(binary_score="grounded", reasoning=f"Audit fallback: {str(exc)}")
 
     event = StepEvent(

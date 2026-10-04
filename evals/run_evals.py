@@ -9,8 +9,12 @@ Benchmarks the engine across high-stakes contractual failure modes:
 
 import json
 from pathlib import Path
+import sys
 import time
 from typing import Any, Dict, List
+
+# Ensure src is in Python path for standalone script execution
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from axiom.core.graph import create_score_graph
 from axiom.core.state import AgentState, DocumentChunk

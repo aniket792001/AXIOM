@@ -62,6 +62,7 @@ def rewriter_node(state: AgentState) -> Dict[str, Any]:
             new_query = result.rewritten_query
             strategy = result.search_strategy
     except Exception:
+        report_quota_exhausted("gemini", 300.0)
         new_query = f"{original_query} addendum amendment"
 
     event = StepEvent(
