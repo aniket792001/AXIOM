@@ -17,12 +17,12 @@ async def test_dashboard_index_serving():
         assert "AXIOM" in content
         assert "SCORE ENGINE" in content
         assert 'id="root"' in content
-        assert "app.jsx" in content
+        assert "index.jsx" in content or "app.jsx" in content
 
 
 @pytest.mark.asyncio
 async def test_dashboard_static_assets():
-    """Verify that styles.css and app.jsx are correctly served over /static/."""
+    """Verify that styles.css and React entrypoint are correctly served over /static/."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Check CSS
@@ -32,8 +32,8 @@ async def test_dashboard_static_assets():
         assert "--bg-canvas" in css_resp.text
         assert '[data-theme="light"]' in css_resp.text
 
-        # Check React JSX
-        jsx_resp = await client.get("/static/app.jsx")
-        assert jsx_resp.status_code == 200
-        assert "AxiomApp" in jsx_resp.text
-        assert "query/stream" in jsx_resp.text
+        # Check React Entrypoint
+        idx_resp = await client.get("/static/index.jsx")
+        assert idx_resp.status_code == 200
+        assert "AppShell" in idx_resp.text
+

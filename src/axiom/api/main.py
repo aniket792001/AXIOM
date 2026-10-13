@@ -11,6 +11,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+import mimetypes
+
+# Ensure Windows properly recognizes JavaScript/JSX MIME types for ES Modules
+mimetypes.add_type("application/javascript", ".js")
+mimetypes.add_type("application/javascript", ".jsx")
 
 from axiom.api.routes import (
     auth_router,
