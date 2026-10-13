@@ -1,5 +1,6 @@
 """Database Engine & Session Management for Axiom."""
 
+import os
 from pathlib import Path
 from typing import Generator
 from sqlalchemy import create_engine, text
@@ -51,6 +52,9 @@ def init_db() -> None:
         except Exception as exc:
             print(f"[!] Schema migration note: {exc}")
 
+    # Default demo password loaded from environment (never hardcode secrets in source)
+    demo_pass = os.getenv("AXIOM_DEMO_PASSWORD", "demo_axiom_pass")
+
     # Seed default enterprise users or assign default hashes if missing
     with SessionLocal() as db:
         admin = db.query(User).filter_by(email="admin@axiom.ai").first()
@@ -64,10 +68,10 @@ def init_db() -> None:
                 avatar="AV",
                 is_active=True,
             )
-            admin_u.set_password("AxiomAdmin2026!")
+            admin_u.set_password(demo_pass)
             db.add(admin_u)
         elif not admin.hashed_password:
-            admin.set_password("AxiomAdmin2026!")
+            admin.set_password(demo_pass)
 
         analyst = db.query(User).filter_by(email="analyst@axiom.ai").first()
         if not analyst:
@@ -80,10 +84,10 @@ def init_db() -> None:
                 avatar="SC",
                 is_active=True,
             )
-            analyst_u.set_password("AxiomAnalyst2026!")
+            analyst_u.set_password(demo_pass)
             db.add(analyst_u)
         elif not analyst.hashed_password:
-            analyst.set_password("AxiomAnalyst2026!")
+            analyst.set_password(demo_pass)
 
         auditor = db.query(User).filter_by(email="auditor@axiom.ai").first()
         if not auditor:
@@ -96,9 +100,9 @@ def init_db() -> None:
                 avatar="MS",
                 is_active=True,
             )
-            auditor_u.set_password("AxiomAuditor2026!")
+            auditor_u.set_password(demo_pass)
             db.add(auditor_u)
         elif not auditor.hashed_password:
-            auditor.set_password("AxiomAuditor2026!")
+            auditor.set_password(demo_pass)
 
         db.commit()

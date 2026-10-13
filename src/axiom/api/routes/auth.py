@@ -1,5 +1,6 @@
 """Role-Based Authentication, JWT Security & User Profile Management for Axiom."""
 
+import os
 from datetime import datetime, timezone
 import secrets
 from typing import Any, Dict, List, Optional
@@ -180,7 +181,7 @@ async def login(payload: LoginRequest) -> LoginResponse:
             if payload.password:
                 db_user.set_password(payload.password)
             elif email in DEMO_USERS:
-                db_user.set_password("AxiomAdmin2026!" if new_role == "admin" else "AxiomPassword2026!")
+                db_user.set_password(os.getenv("AXIOM_DEMO_PASSWORD", "demo_axiom_pass"))
 
             db.add(db_user)
             db.commit()
@@ -238,7 +239,7 @@ async def register_user(payload: RegisterRequest) -> Dict[str, Any]:
         if payload.password:
             new_user.set_password(payload.password)
         else:
-            new_user.set_password("AxiomDefault2026!")
+            new_user.set_password(os.getenv("AXIOM_DEFAULT_PASSWORD", "axiom_user_pass"))
 
         db.add(new_user)
         db.commit()

@@ -4,6 +4,13 @@
 .env
 *.pem
 *.key
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/vault_store.json
 
 # ==============================================================================
 # Python & Virtual Environments (LOCAL ONLY)

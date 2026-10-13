@@ -35,10 +35,13 @@ def test_auth_login_roles():
 
 def test_auth_password_verification_and_rejection():
     """Verify password-based authentication with Bcrypt and rejection of wrong password."""
+    import os
+    demo_pwd = os.getenv("AXIOM_DEMO_PASSWORD", "demo_axiom_pass")
+
     # Correct password for admin
     res_valid = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@axiom.ai", "password": "AxiomAdmin2026!"},
+        json={"email": "admin@axiom.ai", "password": demo_pwd},
     )
     assert res_valid.status_code == 200
     assert res_valid.json()["user"]["email"] == "admin@axiom.ai"
@@ -46,7 +49,7 @@ def test_auth_password_verification_and_rejection():
     # Incorrect password for admin
     res_invalid = client.post(
         "/api/v1/auth/login",
-        json={"email": "admin@axiom.ai", "password": "WrongPassword123!"},
+        json={"email": "admin@axiom.ai", "password": "incorrect_mock_pass"},
     )
     assert res_invalid.status_code == 401
     assert "Incorrect password" in res_invalid.json()["detail"]
@@ -88,7 +91,7 @@ def test_database_users_and_registration():
     # Register a new customer with a password
     import time
     test_email = f"customer_{int(time.time())}@enterprise.com"
-    initial_password = "SecurePassword123!"
+    initial_password = "test_init_pass_123"
     res_reg = client.post(
         "/api/v1/auth/register",
         json={
@@ -123,11 +126,11 @@ def test_database_users_and_registration():
     assert updated_data["user"]["default_tenant"] == "financial_filings"
 
     # Verify changing password (POST /api/v1/auth/change-password)
-    new_password = "UpdatedPassword2026!"
+    new_password = "test_updated_pass_456"
     # Wrong current password fails
     res_fail_change = client.post(
         f"/api/v1/auth/change-password?token={token}",
-        json={"current_password": "WrongCurrentPassword!", "new_password": new_password},
+        json={"current_password": "test_wrong_pass_789", "new_password": new_password},
     )
     assert res_fail_change.status_code == 400
 

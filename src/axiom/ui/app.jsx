@@ -3035,7 +3035,7 @@ function AuthGateModal({ onLogin, onRegister }) {
                 disabled={loading}
               />
               <span style={{ fontSize: "11px", color: "var(--text-muted)", marginTop: "3px" }}>
-                Tip: Demo accounts use <code>AxiomAdmin2026!</code>, <code>AxiomAnalyst2026!</code>, etc.
+                Tip: Select a demo persona above for 1-click access, or enter your credentials.
               </span>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "18px" }}>

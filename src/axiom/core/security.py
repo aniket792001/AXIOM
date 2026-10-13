@@ -6,13 +6,14 @@ Implements:
 - OAuth2 Bearer token extraction and validation
 """
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 import bcrypt
 import jwt
 
-# Enterprise JWT Configuration (Min 256 bits for HMAC-SHA256 compliant with RFC 7518)
-JWT_SECRET_KEY = "axiom-score-engine-jwt-secret-key-enterprise-production-grade-2026-secure"
+# Enterprise JWT Configuration (Configurable via environment variable)
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "axiom_dev_fallback_secret_key_hs256")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
