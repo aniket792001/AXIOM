@@ -7,17 +7,29 @@ applies cross-encoder re-ranking, and enforces strict tenant_id isolation.
 
 from typing import Any, Dict, List
 from axiom.core.state import AgentState, DocumentChunk, StepEvent
-from axiom.services.reranker import get_reranker
-from axiom.services.vector_store import get_vector_store
-from axiom.services.web_search import get_web_search
 
 
 def retriever_node(state: AgentState) -> Dict[str, Any]:
     """Retrieve candidate context chunks based on query, routing decision, and tenant_id."""
-    query = state.get("rewritten_query") or state.get("query", "")
+    from axiom.services.reranker import get_reranker
+    from axiom.services.vector_store import get_vector_store
+    from axiom.services.web_search import get_web_search
+
+    raw_query = state.get("rewritten_query") or state.get("query", "")
     route = state.get("route", "vector_store")
     tenant_id = state.get("tenant_id", "default_tenant")
     existing_docs = state.get("documents", [])
+    chat_history = state.get("chat_history") or []
+
+    # Multi-turn contextualization: merge topic of prior question if follow-up
+    query = raw_query
+    if chat_history and not state.get("rewritten_query"):
+        last_user = next((m.get("content", "") for m in reversed(chat_history) if m.get("role") == "user"), "")
+        if last_user and last_user.lower() != query.lower():
+            # If follow-up question references prior turn
+            pronouns = {"it", "this", "that", "these", "those", "he", "his", "she", "her", "which", "more", "project", "subject"}
+            if any(p in query.lower().split() for p in pronouns) or len(query.split()) <= 4:
+                query = f"{raw_query} {last_user}"
 
     vector_store = get_vector_store()
     reranker = get_reranker()
@@ -39,8 +51,19 @@ def retriever_node(state: AgentState) -> Dict[str, Any]:
         # 2. Apply Cross-Encoder Re-Ranking to select top-5 high-precision chunks
         retrieved_chunks = reranker.rerank(query=query, chunks=candidates, top_k=5)
 
-    # Fallback to seeded demo chunks if vector store has no documents for this tenant yet
+    # Fallback: if search returned no direct match, check if tenant has user-uploaded documents
     if not retrieved_chunks:
+        existing_vault_docs = vector_store.list_documents(tenant_id)
+        if existing_vault_docs:
+            # User has documents (e.g. resume) uploaded in this tenant: pull chunks from them
+            user_chunks: List[DocumentChunk] = []
+            for d_meta in existing_vault_docs:
+                user_chunks.extend(vector_store.get_document_chunks(tenant_id, d_meta["filename"]))
+            if user_chunks:
+                retrieved_chunks = reranker.rerank(query=query, chunks=user_chunks, top_k=5)
+
+    # Only seed demo benchmark chunks if the vault partition is completely empty (0 documents)
+    if not retrieved_chunks and not vector_store.list_documents(tenant_id):
         seeded_chunks = [
             # 1. Amendment Trap (2022 MSA vs 2024 Addendum No. 3)
             DocumentChunk(

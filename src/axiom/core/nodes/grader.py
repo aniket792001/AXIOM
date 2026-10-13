@@ -4,6 +4,7 @@ Evaluates retrieved chunks for relevance to the user query.
 Filters out noisy, irrelevant context before generation.
 """
 
+import re
 from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
@@ -61,17 +62,31 @@ def grader_node(state: AgentState) -> Dict[str, Any]:
             except Exception as exc:
                 report_quota_exhausted("gemini", 300.0)
                 llm = None
-                # Fallback on LLM network exception: use keyword overlap
-                query_words = set(w.strip("?.,!") for w in query.lower().split() if len(w) > 2)
-                content_words = set(w.strip("?.,!") for w in doc.content.lower().split() if len(w) > 2)
-                overlap = query_words.intersection(content_words)
-                score = "yes" if len(overlap) >= 1 else "no"
+                # Fallback on LLM network exception: use robust tokenized overlap and domain heuristics
+                query_tokens = set(re.findall(r"\b[a-zA-Z0-9]+\b", query.lower())) - {"tell", "and", "the", "for", "with", "this", "that", "you", "your", "can", "in", "what", "check"}
+                content_tokens = set(re.findall(r"\b[a-zA-Z0-9]+\b", doc.content.lower()))
+                overlap = query_tokens.intersection(content_tokens)
+                
+                query_lower = query.lower()
+                content_lower = doc.content.lower()
+                file_meta = str(doc.metadata.get("file", "")).lower()
+                is_resume_query = any(k in query_lower for k in ["resume", "cv", "skill", "experience", "education", "profile", "candidate", "qualification"])
+                is_resume_doc = ("resume" in file_meta or "cv" in file_meta) or any(k in content_lower for k in ["skills", "experience", "education", "projects", "certifications", "technologies", "developer", "engineer"])
+                
+                score = "yes" if (len(overlap) >= 1 or (is_resume_query and is_resume_doc)) else "no"
         else:
             # Deterministic heuristic grading in key-free test mode
-            query_words = set(w.strip("?.,!") for w in query.lower().split() if len(w) > 2)
-            content_words = set(w.strip("?.,!") for w in doc.content.lower().split() if len(w) > 2)
-            overlap = query_words.intersection(content_words)
-            score = "yes" if len(overlap) >= 1 else "no"
+            query_tokens = set(re.findall(r"\b[a-zA-Z0-9]+\b", query.lower())) - {"tell", "and", "the", "for", "with", "this", "that", "you", "your", "can", "in", "what", "check"}
+            content_tokens = set(re.findall(r"\b[a-zA-Z0-9]+\b", doc.content.lower()))
+            overlap = query_tokens.intersection(content_tokens)
+
+            query_lower = query.lower()
+            content_lower = doc.content.lower()
+            file_meta = str(doc.metadata.get("file", "")).lower()
+            is_resume_query = any(k in query_lower for k in ["resume", "cv", "skill", "experience", "education", "profile", "candidate", "qualification"])
+            is_resume_doc = ("resume" in file_meta or "cv" in file_meta) or any(k in content_lower for k in ["skills", "experience", "education", "projects", "certifications", "technologies", "developer", "engineer"])
+
+            score = "yes" if (len(overlap) >= 1 or (is_resume_query and is_resume_doc)) else "no"
 
         if score == "yes":
             doc.relevance_score = 1.0

@@ -12,7 +12,17 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from axiom.api.routes import chat_router, health_router, ingest_router
+from axiom.api.routes import (
+    auth_router,
+    benchmark_router,
+    chat_router,
+    contradiction_router,
+    documents_router,
+    export_router,
+    health_router,
+    ingest_router,
+    keys_router,
+)
 from axiom.config.settings import get_settings
 
 
@@ -20,6 +30,8 @@ from axiom.config.settings import get_settings
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager for startup and shutdown routines."""
     settings = get_settings()
+    from axiom.db.database import init_db
+    init_db()
     print(f"[*] Starting {settings.app_name} on {settings.app_host}:{settings.app_port} [{settings.app_env}]")
     yield
     print(f"[*] Shutting down {settings.app_name}")
@@ -48,9 +60,15 @@ def create_app() -> FastAPI:
     )
 
     # Register Routers
+    app.include_router(auth_router)
     app.include_router(health_router)
     app.include_router(ingest_router)
     app.include_router(chat_router)
+    app.include_router(documents_router)
+    app.include_router(contradiction_router)
+    app.include_router(export_router)
+    app.include_router(keys_router)
+    app.include_router(benchmark_router)
 
     # Static Assets & Verification Dashboard
     ui_dir = Path(__file__).resolve().parent.parent / "ui"

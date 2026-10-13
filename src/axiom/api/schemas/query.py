@@ -1,4 +1,4 @@
-﻿"""Query Request & Response Pydantic Schemas for Axiom API."""
+"""Query Request & Response Pydantic Schemas for Axiom API."""
 
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
@@ -10,6 +10,7 @@ class QueryRequest(BaseModel):
     query: str = Field(..., description="User question or research prompt", min_length=2)
     tenant_id: str = Field(default="default_tenant", description="Enterprise tenant identifier for data isolation")
     user_id: Optional[str] = Field(default="anonymous_user", description="Identifier of the executing user")
+    session_id: Optional[str] = Field(default="default_session", description="Conversation session ID for multi-turn memory")
 
 
 class QueryResponse(BaseModel):
@@ -20,6 +21,7 @@ class QueryResponse(BaseModel):
     hallucination_status: str
     fallback_reason: Optional[str] = None
     reasoning_trace: List[StepEvent] = Field(default_factory=list)
+    session_id: Optional[str] = Field(default="default_session")
 
 
 class StreamEventData(BaseModel):

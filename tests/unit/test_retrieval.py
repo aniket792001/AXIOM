@@ -1,4 +1,4 @@
-﻿"""Unit tests for Axiom Multi-Tenant Hybrid Retrieval & Re-ranking."""
+"""Unit tests for Axiom Multi-Tenant Hybrid Retrieval & Re-ranking."""
 
 import pytest
 from axiom.core.state import DocumentChunk
@@ -99,3 +99,49 @@ def test_web_search_fallback():
     assert len(results) > 0
     assert isinstance(results[0], DocumentChunk)
     assert "web:" in results[0].id
+
+
+def test_uuid5_point_id_collision_resistance_and_determinism():
+    """Verify that chunk point IDs are valid, deterministic 128-bit UUID5 strings."""
+    import uuid
+    from axiom.services.vector_store import generate_point_id
+
+    chunk_id_1 = "tenant_corp:doc_msa_2024:chunk_12"
+    chunk_id_2 = "tenant_corp:doc_msa_2024:chunk_13"
+
+    point_id_1a = generate_point_id(chunk_id_1)
+    point_id_1b = generate_point_id(chunk_id_1)
+    point_id_2 = generate_point_id(chunk_id_2)
+
+    # Determinism
+    assert point_id_1a == point_id_1b
+    # Uniqueness
+    assert point_id_1a != point_id_2
+    # Standard UUID validity
+    parsed_uuid = uuid.UUID(point_id_1a)
+    assert parsed_uuid.version == 5
+
+
+def test_dynamic_embedding_dimension_resolution():
+    """Verify embedding dimension resolution for Gemini, OpenAI, and custom overrides."""
+    from axiom.services.vector_store import resolve_embedding_dimension
+
+    # Gemini 768 dims
+    assert resolve_embedding_dimension("text-embedding-004") == 768
+    # OpenAI 1536 dims
+    assert resolve_embedding_dimension("text-embedding-3-small") == 1536
+    # OpenAI Large 3072 dims
+    assert resolve_embedding_dimension("text-embedding-3-large") == 3072
+    # Explicit override takes priority
+    assert resolve_embedding_dimension("text-embedding-004", explicit_dim=512) == 512
+    # Unknown fallback default
+    assert resolve_embedding_dimension("unknown-custom-model") == 384
+
+
+def test_settings_qdrant_url_assembly_from_host_and_port():
+    """Verify that Settings automatically assembles qdrant_url when qdrant_host is set."""
+    from axiom.config.settings import Settings
+
+    settings = Settings(qdrant_host="qdrant", qdrant_port=6334)
+    assert settings.qdrant_url == "http://qdrant:6334"
+

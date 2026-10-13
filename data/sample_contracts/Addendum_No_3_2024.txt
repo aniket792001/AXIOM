@@ -1,0 +1,19 @@
+ADDENDUM NO. 3 TO MASTER SERVICES AGREEMENT
+EFFECTIVE DATE: March 10, 2024
+PARTIES: Apex Cloud Systems, Inc. ("Vendor") and Global Retail Corp. ("Customer")
+
+PREAMBLE & MERGER INTENT:
+This Addendum No. 3 expressly amends, supplements, and supersedes conflicting terms of the Master Services Agreement dated January 15, 2022. To the extent any provision of this Addendum conflicts with the 2022 MSA, this Addendum shall control and take precedence under the legal merger doctrine.
+
+ARTICLE 1: AMENDMENT TO SECTION 4 (LIABILITY & TERMINATION)
+1.1 Amended Liability Cap:
+Section 4.1 of the 2022 MSA is hereby deleted and replaced in its entirety. For all Tier 2 Enterprise Customers, Vendor's total aggregate liability arising out of this Agreement or any breach thereof is increased to $2,500,000 (Two Million Five Hundred Thousand USD).
+
+1.2 Amended Termination Notice:
+Section 4.2 of the 2022 MSA is hereby amended such that the required written notice period for Termination for Convenience is extended from thirty (30) days to sixty (60) days.
+
+ARTICLE 2: AMENDMENT TO GOVERNING LAW & JURISDICTION
+Section 3 of the 2022 MSA is hereby superseded. The parties agree that this Agreement and all disputes shall now be governed by the laws of the State of New York, and exclusive jurisdiction shall lie with the state and federal courts situated in New York County, New York.
+
+ARTICLE 3: FULL FORCE AND EFFECT
+Except as expressly modified by this Addendum No. 3, all remaining terms and conditions of the 2022 Master Services Agreement remain in full force and effect.

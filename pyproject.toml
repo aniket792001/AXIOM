@@ -58,6 +58,7 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "cohere>=5.11.0",
     "tiktoken>=0.7.0",
+    "pypdf>=5.0.0",
 
     # Web Search & Tooling Fallback
     "tavily-python>=0.5.0",
@@ -65,7 +66,11 @@ dependencies = [
 
     # Utilities & Resilience
     "tenacity>=9.0.0",
-    "jinja2>=3.1.4"
+    "jinja2>=3.1.4",
+
+    # Cryptographic Audit Reporting & Compliance
+    "reportlab>=4.0.0",
+    "openpyxl>=3.1.0"
 ]
 
 [project.optional-dependencies]

@@ -1,20 +1,20 @@
-﻿"""Axiom & SCORE AgentState Definition.
+"""Axiom & SCORE AgentState Definition.
 
 Typed schema for the LangGraph state machine.
 Supports multi-tenancy, deterministic citations, and reasoning event traces.
 """
 
 from operator import add
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 
 class DocumentChunk(BaseModel):
     """Represents an ingested or retrieved document snippet."""
     id: str = Field(description="Unique chunk identifier, e.g. doc123:chunk4")
     content: str = Field(description="Extracted text or markdown content")
-    metadata: Dict[str, str] = Field(default_factory=dict, description="Metadata: file, page, section")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Metadata: file, page, section")
     relevance_score: Optional[float] = Field(default=None, description="Calculated relevance or rerank score")
 
 
@@ -66,3 +66,7 @@ class AgentState(TypedDict):
 
     # Cumulative Diagnostics (appended using operator.add)
     reasoning_trace: Annotated[List[StepEvent], add]
+
+    # Conversational History & Session Isolation
+    session_id: NotRequired[Optional[str]]
+    chat_history: NotRequired[Optional[List[Dict[str, str]]]]

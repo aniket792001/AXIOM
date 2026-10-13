@@ -6,7 +6,7 @@ Loads environment variables from .env file or system environment.
 
 from functools import lru_cache
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     # Vector Database
     vector_store_type: str = Field(default="qdrant", description="Vector store: qdrant or chroma")
     qdrant_url: str = Field(default="http://localhost:6333", description="Qdrant service URL")
+    qdrant_host: Optional[str] = Field(default=None, description="Optional Qdrant host fallback")
+    qdrant_port: Optional[int] = Field(default=6333, description="Optional Qdrant port fallback")
     qdrant_api_key: Optional[str] = Field(default=None, description="Qdrant API Key")
     qdrant_collection: str = Field(default="axiom_contracts", description="Vector collection name")
 
@@ -52,7 +54,18 @@ class Settings(BaseSettings):
         default="text-embedding-004",
         description="Embedding model name",
     )
+    embedding_dim: Optional[int] = Field(
+        default=None,
+        description="Embedding vector dimension override (auto-derived if None)",
+    )
     bm25_enabled: bool = Field(default=True, description="Enable sparse BM25 keyword retrieval")
+
+    @model_validator(mode="after")
+    def assemble_qdrant_url(self) -> "Settings":
+        """Assemble qdrant_url dynamically if qdrant_host is supplied."""
+        if self.qdrant_host and (self.qdrant_url == "http://localhost:6333" or not self.qdrant_url):
+            self.qdrant_url = f"http://{self.qdrant_host}:{self.qdrant_port or 6333}"
+        return self
     reranker_enabled: bool = Field(default=False, description="Enable cross-encoder re-ranking")
     cohere_api_key: Optional[str] = Field(default=None, description="Cohere API key for re-ranking")
 

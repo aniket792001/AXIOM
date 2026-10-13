@@ -1,0 +1,22 @@
+MASTER SERVICES AGREEMENT (2022)
+PARTIES: Apex Cloud Systems, Inc. ("Vendor") and Global Retail Corp. ("Customer")
+EFFECTIVE DATE: January 15, 2022
+
+SECTION 1: SERVICES & PLATFORM ACCESS
+Vendor agrees to provide Customer with multi-region cloud infrastructure and database synchronization services.
+
+SECTION 2: PAYMENT & BILLING
+All undisputed invoices shall be payable Net 30 days from date of receipt. Any late payments accrue interest at 1.5% per month.
+
+SECTION 3: GOVERNING LAW & DISPUTE RESOLUTION
+This Agreement shall be governed by and construed in accordance with the laws of the State of Delaware. All disputes shall be settled via binding arbitration in Wilmington, Delaware.
+
+SECTION 4: LIABILITY & INDEMNIFICATION
+Section 4.1 Liability Cap:
+Except for breaches of confidentiality under Section 7, in no event shall Vendor's total aggregate liability arising out of or related to this Agreement exceed $1,000,000 (One Million USD).
+
+Section 4.2 Termination for Convenience:
+Either party may terminate this Agreement or any applicable Order Form without cause upon delivering thirty (30) days prior written notice to the other party.
+
+SECTION 5: DATA PROTECTION & AUDIT
+Vendor shall maintain SOC 2 Type II compliance and ISO 27001 certifications. Customer has the right to inspect audit summaries once per calendar year upon twenty (20) business days notice.

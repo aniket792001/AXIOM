@@ -9,6 +9,7 @@ import hashlib
 import math
 import re
 from typing import Any, Dict, List, Optional, Tuple
+import uuid
 
 from axiom.config.settings import get_settings
 from axiom.core.state import DocumentChunk
@@ -17,6 +18,29 @@ from axiom.core.state import DocumentChunk
 def tokenize(text: str) -> List[str]:
     """Tokenize text into alphanumeric and dotted identifiers for BM25."""
     return [t for t in re.findall(r"[a-zA-Z0-9_\.]+", text.lower()) if t]
+
+
+def resolve_embedding_dimension(model_name: str, explicit_dim: Optional[int] = None) -> int:
+    """Resolve embedding vector dimension dynamically based on model or explicit override."""
+    if explicit_dim is not None and explicit_dim > 0:
+        return explicit_dim
+    model_lower = model_name.lower()
+    if "text-embedding-004" in model_lower or "embedding-004" in model_lower:
+        return 768
+    if "text-embedding-3-large" in model_lower:
+        return 3072
+    if "text-embedding-3-small" in model_lower or "text-embedding-ada-002" in model_lower:
+        return 1536
+    if "bge-large" in model_lower:
+        return 1024
+    if "bge-base" in model_lower:
+        return 768
+    return 384
+
+
+def generate_point_id(chunk_id: str) -> str:
+    """Generate deterministic 128-bit UUID5 point ID for Qdrant to eliminate hash collisions."""
+    return str(uuid.uuid5(uuid.NAMESPACE_DNS, chunk_id))
 
 
 def _deterministic_mock_embedding(text: str, dim: int = 384) -> List[float]:
@@ -40,8 +64,45 @@ class HybridVectorStore:
         self._bm25_indices: Dict[str, Any] = {}
         self._corpus_store: Dict[str, List[DocumentChunk]] = defaultdict(list)
         self._collection_name = self.settings.qdrant_collection
-        self._dim = 384
+        self._dim = resolve_embedding_dimension(
+            self.settings.embedding_model, self.settings.embedding_dim
+        )
         self._init_qdrant()
+        self._load_from_disk()
+
+    def _save_to_disk(self) -> None:
+        """Persist corpus store to data/vault_store.json so user uploads survive server reloads."""
+        try:
+            from pathlib import Path
+            import json
+            data_dir = Path("data")
+            data_dir.mkdir(parents=True, exist_ok=True)
+            store_file = data_dir / "vault_store.json"
+            serializable = {}
+            for t_id, chunks in self._corpus_store.items():
+                if not t_id.startswith("test_"):
+                    serializable[t_id] = [c.model_dump() for c in chunks]
+            store_file.write_text(json.dumps(serializable, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _load_from_disk(self) -> None:
+        """Load persisted documents from data/vault_store.json if present."""
+        try:
+            from pathlib import Path
+            import json
+            store_file = Path("data") / "vault_store.json"
+            if not store_file.exists():
+                return
+            content = store_file.read_text(encoding="utf-8")
+            if not content.strip():
+                return
+            data = json.loads(content)
+            for t_id, raw_chunks in data.items():
+                chunks = [DocumentChunk(**c) for c in raw_chunks]
+                self.ingest_documents(t_id, chunks, persist=False)
+        except Exception:
+            pass
 
     def _init_qdrant(self) -> None:
         """Initialize Qdrant client (remote or local in-memory fallback)."""
@@ -83,14 +144,28 @@ class HybridVectorStore:
                 return embedder.embed_query(text)
             except Exception:
                 report_quota_exhausted("gemini", 300.0)
+        elif self.settings.openai_api_key and is_provider_available("openai"):
+            try:
+                from langchain_openai import OpenAIEmbeddings
+                embedder = OpenAIEmbeddings(
+                    model=self.settings.embedding_model if "text-embedding" in self.settings.embedding_model else "text-embedding-3-small",
+                    api_key=self.settings.openai_api_key,
+                )
+                return embedder.embed_query(text)
+            except Exception:
+                pass
         return _deterministic_mock_embedding(text, self._dim)
 
-    def ingest_documents(self, tenant_id: str, chunks: List[DocumentChunk]) -> int:
+    def ingest_documents(self, tenant_id: str, chunks: List[DocumentChunk], persist: bool = True) -> int:
         """Ingest document chunks into both dense vector store and sparse BM25 index."""
         if not chunks:
             return 0
 
-        self._corpus_store[tenant_id].extend(chunks)
+        # Deduplicate incoming chunks with existing store by chunk ID
+        existing_chunks = self._corpus_store[tenant_id]
+        incoming_ids = {c.id for c in chunks}
+        filtered_existing = [c for c in existing_chunks if c.id not in incoming_ids]
+        self._corpus_store[tenant_id] = filtered_existing + list(chunks)
 
         corpus_texts = [c.content for c in self._corpus_store[tenant_id]]
         tokenized_corpus = [tokenize(doc) for doc in corpus_texts]
@@ -106,7 +181,7 @@ class HybridVectorStore:
             points = []
             for chunk in chunks:
                 vector = self._get_embedding(chunk.content)
-                point_id = int(hashlib.md5(chunk.id.encode()).hexdigest()[:8], 16)
+                point_id = generate_point_id(chunk.id)
                 payload = {
                     "tenant_id": tenant_id,
                     "chunk_id": chunk.id,
@@ -121,6 +196,9 @@ class HybridVectorStore:
                 collection_name=self._collection_name,
                 points=points,
             )
+
+        if persist:
+            self._save_to_disk()
 
         return len(chunks)
 
@@ -228,6 +306,89 @@ class HybridVectorStore:
             final_chunks.append(chunk)
 
         return final_chunks
+
+    def list_documents(self, tenant_id: str) -> List[Dict[str, Any]]:
+        """List distinct documents indexed for the specified tenant with summary metrics."""
+        chunks = self._corpus_store.get(tenant_id, [])
+        if not chunks:
+            return []
+
+        doc_groups: Dict[str, Dict[str, Any]] = {}
+        for chunk in chunks:
+            fname = chunk.metadata.get("file") or "unnamed_document"
+            page_val = chunk.metadata.get("page", 1)
+            if fname not in doc_groups:
+                doc_groups[fname] = {
+                    "filename": fname,
+                    "chunk_count": 0,
+                    "total_characters": 0,
+                    "pages": set(),
+                    "preview": chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
+                }
+            doc_groups[fname]["chunk_count"] += 1
+            doc_groups[fname]["total_characters"] += len(chunk.content)
+            doc_groups[fname]["pages"].add(page_val)
+
+        results = []
+        for fname, data in doc_groups.items():
+            results.append({
+                "filename": fname,
+                "chunk_count": data["chunk_count"],
+                "total_characters": data["total_characters"],
+                "page_count": len(data["pages"]),
+                "preview": data["preview"],
+                "status": "indexed",
+            })
+        return sorted(results, key=lambda x: x["filename"])
+
+    def get_document_chunks(self, tenant_id: str, filename: str) -> List[DocumentChunk]:
+        """Retrieve all chunks belonging to a specific document for inspection."""
+        chunks = self._corpus_store.get(tenant_id, [])
+        return [c for c in chunks if c.metadata.get("file") == filename or filename in c.id]
+
+    def delete_document(self, tenant_id: str, filename: str) -> int:
+        """Purge all chunks and vectors belonging to a document from Qdrant and BM25."""
+        tenant_chunks = self._corpus_store.get(tenant_id, [])
+        if not tenant_chunks:
+            return 0
+
+        chunks_to_delete = [
+            c for c in tenant_chunks if c.metadata.get("file") == filename or filename in c.id
+        ]
+        if not chunks_to_delete:
+            return 0
+
+        # Purge from memory corpus
+        remaining_chunks = [
+            c for c in tenant_chunks if c.metadata.get("file") != filename and filename not in c.id
+        ]
+        self._corpus_store[tenant_id] = remaining_chunks
+
+        # Rebuild BM25 index with remaining chunks
+        if remaining_chunks:
+            corpus_texts = [c.content for c in remaining_chunks]
+            tokenized_corpus = [tokenize(doc) for doc in corpus_texts]
+            try:
+                from rank_bm25 import BM25Plus
+                self._bm25_indices[tenant_id] = BM25Plus(tokenized_corpus)
+            except ImportError:
+                self._bm25_indices[tenant_id] = tokenized_corpus
+        else:
+            self._bm25_indices.pop(tenant_id, None)
+
+        # Purge points from Qdrant
+        if self._qdrant_client:
+            point_ids = [generate_point_id(c.id) for c in chunks_to_delete]
+            try:
+                self._qdrant_client.delete(
+                    collection_name=self._collection_name,
+                    points_selector=point_ids,
+                )
+            except Exception:
+                pass
+
+        self._save_to_disk()
+        return len(chunks_to_delete)
 
 
 _hybrid_store_instance: Optional[HybridVectorStore] = None

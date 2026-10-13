@@ -13,10 +13,29 @@ from axiom.core.prompts_loader import load_prompt
 from axiom.core.state import AgentState, StepEvent
 
 
+import re
+
+
 class RouteDecision(BaseModel):
     """Structured decision output for the router node."""
     route: str = Field(description="Selected route: vector_store, web_search, or direct")
     reasoning: str = Field(description="Brief explanation of routing choice")
+
+
+def _classify_heuristic(query: str) -> RouteDecision:
+    lowered = query.lower().strip()
+    words = set(re.findall(r"\b[a-zA-Z]+\b", lowered))
+    if words.intersection({"hi", "hello", "hey", "greetings"}) or lowered in ["who are you", "who are you?"]:
+        # Only treat as direct greeting if query is very short or purely a greeting
+        if len(words) <= 4:
+            return RouteDecision(route="direct", reasoning="Heuristic detected conversational greeting")
+
+    realtime_terms = ["latest news", "today news", "current weather", "stock price", "live market"]
+    if any(t in lowered for t in realtime_terms):
+        return RouteDecision(route="web_search", reasoning="Heuristic detected real-time keywords")
+
+    return RouteDecision(route="vector_store", reasoning="Heuristic routed to enterprise documents")
+
 
 
 def router_node(state: AgentState) -> Dict[str, Any]:
@@ -52,24 +71,10 @@ def router_node(state: AgentState) -> Dict[str, Any]:
             structured_llm = llm.with_structured_output(RouteDecision)
             decision = structured_llm.invoke(prompt)
         else:
-            # Deterministic heuristic fallback when running in key-free local mode
-            lowered = query.lower()
-            if any(w in lowered for w in ["latest", "news", "today", "current weather", "stock price"]):
-                decision = RouteDecision(route="web_search", reasoning="Heuristic detected real-time keywords")
-            elif any(w in lowered for w in ["hi", "hello", "hey", "who are you"]):
-                decision = RouteDecision(route="direct", reasoning="Heuristic detected conversational greeting")
-            else:
-                decision = RouteDecision(route="vector_store", reasoning="Heuristic defaulted to enterprise documents")
+            decision = _classify_heuristic(query)
     except Exception as exc:
         report_quota_exhausted("gemini", 300.0)
-        # Deterministic heuristic fallback on LLM error
-        lowered = query.lower()
-        if any(w in lowered for w in ["latest", "news", "today", "current weather", "stock price"]):
-            decision = RouteDecision(route="web_search", reasoning="Heuristic detected real-time keywords")
-        elif any(w in lowered for w in ["hi", "hello", "hey", "who are you"]):
-            decision = RouteDecision(route="direct", reasoning="Heuristic detected conversational greeting")
-        else:
-            decision = RouteDecision(route="vector_store", reasoning="Heuristic defaulted to enterprise documents")
+        decision = _classify_heuristic(query)
 
     event = StepEvent(
         node="router",
