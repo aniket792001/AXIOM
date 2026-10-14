@@ -10,7 +10,7 @@ export function useVault(activeTenant) {
     setLoading(true);
     try {
       const data = await api.getVaultDocuments(activeTenant);
-      setVaultDocs(data.documents || []);
+      setVaultDocs(Array.isArray(data) ? data : (data.documents || []));
     } catch {
       setVaultDocs([]);
     } finally {

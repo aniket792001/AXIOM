@@ -1,18 +1,23 @@
-"""Chat & Real-Time SSE Query Routes for Axiom API Gateway."""
-
 import asyncio
 from collections import defaultdict
+from datetime import datetime
 import json
-from typing import Any, AsyncGenerator, Dict, List
-from fastapi import APIRouter, HTTPException, status
+from typing import Any, AsyncGenerator, Dict, List, Optional
+from fastapi import APIRouter, Header, HTTPException, Query, status
 from sse_starlette.sse import EventSourceResponse
 
-from datetime import datetime
 from axiom.api.schemas.query import QueryRequest, QueryResponse
 from axiom.core.graph import create_score_graph
+from axiom.core.security import (
+    check_permission,
+    extract_bearer_token,
+    resolve_user_from_token,
+    verify_tenant_access,
+)
 from axiom.core.state import AgentState
 from axiom.db.database import SessionLocal
 from axiom.db.models import QueryRecord, SessionThread
+
 
 router = APIRouter(prefix="/api/v1", tags=["Query & Streaming"])
 
@@ -100,8 +105,20 @@ def _build_initial_state(payload: QueryRequest) -> AgentState:
 
 
 @router.get("/sessions")
-async def list_sessions(tenant_id: str = "default_tenant", user_id: str = None) -> List[Dict[str, Any]]:
-    """List customer conversation threads stored in the SQLite database."""
+async def list_sessions(
+    tenant_id: str = "default_tenant",
+    user_id: str = None,
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+) -> List[Dict[str, Any]]:
+    """List customer conversation threads stored in the SQLite database with tenant isolation."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    if user:
+        if user.get("role") != "admin":
+            tenant_id = user.get("default_tenant", tenant_id)
+            user_id = user.get("email")
+        verify_tenant_access(user, tenant_id)
+
     with SessionLocal() as db:
         q = db.query(SessionThread).filter_by(tenant_id=tenant_id)
         if user_id:
@@ -119,8 +136,19 @@ async def get_session_history(session_id: str) -> List[Dict[str, Any]]:
 
 
 @router.get("/history/audit")
-async def get_history_audit(tenant_id: str = None, limit: int = 100) -> Dict[str, Any]:
+async def get_history_audit(
+    tenant_id: str = None,
+    limit: int = 100,
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+) -> Dict[str, Any]:
     """Retrieve full audit log of customer queries, retrievals, and hallucination verdicts."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    if user:
+        check_permission(user, "view_audit")
+        if user.get("role") != "admin":
+            tenant_id = user.get("default_tenant")
+
     with SessionLocal() as db:
         q = db.query(QueryRecord)
         if tenant_id:
@@ -145,8 +173,19 @@ async def clear_session(session_id: str) -> dict:
 
 
 @router.post("/query", response_model=QueryResponse)
-async def query_synchronous(payload: QueryRequest) -> QueryResponse:
+async def query_synchronous(
+    payload: QueryRequest,
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+) -> QueryResponse:
     """Execute a synchronous reasoning query over Axiom's SCORE engine."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    if user:
+        check_permission(user, "query")
+        verify_tenant_access(user, payload.tenant_id)
+        if user.get("email"):
+            payload.user_id = user.get("email")
+
     graph = create_score_graph()
     initial_state = _build_initial_state(payload)
 
@@ -188,8 +227,19 @@ async def query_synchronous(payload: QueryRequest) -> QueryResponse:
 
 
 @router.post("/query/stream")
-async def query_streaming(payload: QueryRequest) -> EventSourceResponse:
+async def query_streaming(
+    payload: QueryRequest,
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+) -> EventSourceResponse:
     """Stream real-time agent execution events and final answer via Server-Sent Events (SSE)."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    if user:
+        check_permission(user, "query")
+        verify_tenant_access(user, payload.tenant_id)
+        if user.get("email"):
+            payload.user_id = user.get("email")
+
     graph = create_score_graph()
     initial_state = _build_initial_state(payload)
     session_id = payload.session_id or "default_session"

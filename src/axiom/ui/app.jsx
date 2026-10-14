@@ -17,6 +17,15 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
 const BASE_URL = "";
 
+function getAuthHeaders(extraHeaders = {}) {
+  const token = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("axiom_token") : null;
+  const headers = { ...extraHeaders };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 const api = {
   // ---------------------------------------------------------------------------
   // AUTHENTICATION & USER PROFILE
@@ -44,7 +53,7 @@ const api = {
         password,
         role: role || "analyst",
         title: title || "Enterprise User",
-        default_tenant: default_tenant || "default_tenant",
+        default_tenant: default_tenant || null,
       }),
     });
     if (!res.ok) {
@@ -56,7 +65,7 @@ const api = {
 
   async getProfile(token) {
     const res = await fetch(`${BASE_URL}/api/v1/auth/me?token=${encodeURIComponent(token || "")}`, {
-      headers: { Authorization: `Bearer ${token || ""}` },
+      headers: getAuthHeaders({ Authorization: `Bearer ${token || ""}` }),
     });
     if (!res.ok) throw new Error("Failed to fetch user profile");
     return res.json();
@@ -65,10 +74,10 @@ const api = {
   async updateProfile(token, profileData) {
     const res = await fetch(`${BASE_URL}/api/v1/auth/me?token=${encodeURIComponent(token || "")}`, {
       method: "PUT",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json",
         Authorization: `Bearer ${token || ""}`,
-      },
+      }),
       body: JSON.stringify(profileData),
     });
     if (!res.ok) {
@@ -81,10 +90,10 @@ const api = {
   async changePassword(token, currentPassword, newPassword) {
     const res = await fetch(`${BASE_URL}/api/v1/auth/change-password?token=${encodeURIComponent(token || "")}`, {
       method: "POST",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json",
         Authorization: `Bearer ${token || ""}`,
-      },
+      }),
       body: JSON.stringify({
         current_password: currentPassword,
         new_password: newPassword,
@@ -104,10 +113,10 @@ const api = {
     try {
       const res = await fetch(`${BASE_URL}/api/v1/query/stream`, {
         method: "POST",
-        headers: {
+        headers: getAuthHeaders({
           "Content-Type": "application/json",
           "X-Axiom-Provider": provider,
-        },
+        }),
         body: JSON.stringify({
           query,
           tenant_id: tenantId || "default_tenant",
@@ -185,7 +194,9 @@ const api = {
   // KNOWLEDGE VAULT & DOCUMENTS
   // ---------------------------------------------------------------------------
   async getVaultDocuments(tenantId) {
-    const res = await fetch(`${BASE_URL}/api/v1/documents?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`);
+    const res = await fetch(`${BASE_URL}/api/v1/documents?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error("Failed to load vault documents");
     return res.json();
   },
@@ -197,6 +208,7 @@ const api = {
 
     const res = await fetch(`${BASE_URL}/api/v1/ingest/file`, {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     });
     if (!res.ok) {
@@ -209,16 +221,24 @@ const api = {
   async deleteDocument(filename, tenantId) {
     const res = await fetch(`${BASE_URL}/api/v1/documents/${encodeURIComponent(filename)}?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
       method: "DELETE",
+      headers: getAuthHeaders(),
     });
-    if (!res.ok) throw new Error("Failed to delete document");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete document");
+    }
     return res.json();
   },
 
-  async viewDocument(filename) {
-    const res = await fetch(`${BASE_URL}/api/v1/documents/${encodeURIComponent(filename)}/view`);
+  async viewDocument(filename, tenantId) {
+    const t = tenantId ? `?tenant_id=${encodeURIComponent(tenantId)}` : "";
+    const res = await fetch(`${BASE_URL}/api/v1/documents/${encodeURIComponent(filename)}/view${t}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error("Document view unavailable");
     return res.json();
   },
+
 
   // ---------------------------------------------------------------------------
   // CONTRACT CONTRADICTION & DIFF
@@ -274,18 +294,25 @@ const api = {
   // SESSIONS, AUDIT & EXPORT
   // ---------------------------------------------------------------------------
   async getSessions(tenantId) {
-    const res = await fetch(`${BASE_URL}/api/v1/sessions?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`);
+    const res = await fetch(`${BASE_URL}/api/v1/sessions?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) return [];
     return res.json();
   },
 
   async deleteSession(sessionId) {
-    const res = await fetch(`${BASE_URL}/api/v1/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+    const res = await fetch(`${BASE_URL}/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
     return res.ok;
   },
 
   async getAuditHistory(tenantId) {
-    const res = await fetch(`${BASE_URL}/api/v1/history/audit?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`);
+    const res = await fetch(`${BASE_URL}/api/v1/history/audit?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) return { records: [], total: 0 };
     return res.json();
   },
@@ -297,7 +324,7 @@ const api = {
 
     const res = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         query,
         generation,
@@ -458,11 +485,19 @@ function useAuth() {
     }
   }, [token]);
 
+  const updateActiveTenant = useCallback((newTenant) => {
+    if (user && user.role !== "admin") {
+      // Non-admins are strictly isolated to their own workspace
+      return;
+    }
+    setActiveTenant(newTenant);
+  }, [user]);
+
   return {
     user,
     token,
     activeTenant,
-    setActiveTenant,
+    setActiveTenant: updateActiveTenant,
     loading,
     error,
     login,
@@ -472,6 +507,7 @@ function useAuth() {
     changePassword,
   };
 }
+
 
 /* --- SOURCE: useChat.js --- */
 
@@ -638,7 +674,7 @@ function useVault(activeTenant) {
     setLoading(true);
     try {
       const data = await api.getVaultDocuments(activeTenant);
-      setVaultDocs(data.documents || []);
+      setVaultDocs(Array.isArray(data) ? data : (data.documents || []));
     } catch {
       setVaultDocs([]);
     } finally {
@@ -836,15 +872,28 @@ function Header({
         {/* Tenant Partition Selector */}
         <div className="tenant-badge-selector">
           <span className="tenant-icon">🏢</span>
-          <select
-            className="tenant-select"
-            value={activeTenant}
-            onChange={(e) => setActiveTenant(e.target.value)}
-          >
-            <option value="default_tenant">Master Enterprise Vault</option>
-            <option value="legal_contracts">Legal & Compliance Vault</option>
-            <option value="financial_filings">Financial Filings (10-K/10-Q)</option>
-          </select>
+          {user?.role === "admin" ? (
+            <select
+              className="tenant-select"
+              value={activeTenant}
+              onChange={(e) => setActiveTenant(e.target.value)}
+              title="Administrator Cross-Tenant Partition Selector"
+            >
+              <option value={user?.default_tenant || "default_tenant"}>
+                👤 My Private Workspace ({user?.name ? user.name.split(" ")[0] : "Admin"})
+              </option>
+              <option value="default_tenant">Master Enterprise Vault (Demo)</option>
+              <option value="legal_contracts">Legal & Compliance Vault (Demo)</option>
+              <option value="financial_filings">Financial Filings (Demo)</option>
+            </select>
+          ) : (
+            <div className="tenant-locked-badge" title="Isolated Workspace: Access strictly restricted to your private data room">
+              <span className="locked-icon">🔒</span>
+              <span className="locked-tenant-name">
+                {user?.name ? `${user.name.split(" ")[0]}'s Vault` : "My Workspace"} (Isolated)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Model Provider */}
@@ -1180,8 +1229,17 @@ function VaultScreen({
   onDelete,
   onOpenVisualizer,
   activeTenant,
+  user,
 }) {
   const fileInputRef = useRef(null);
+
+  // RBAC Permission Checks
+  const canIngest = user
+    ? user.role !== "auditor" && (!user.permissions || user.permissions.includes("ingest"))
+    : true;
+  const canDelete = user
+    ? user.role === "admin" || (user.permissions && user.permissions.includes("delete_docs"))
+    : false;
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -1191,14 +1249,34 @@ function VaultScreen({
     }
   };
 
+  const getRoleBadge = () => {
+    if (!user) return null;
+    if (user.role === "admin") {
+      return <span className="role-chip admin">👑 Administrator (Full Control)</span>;
+    }
+    if (user.role === "auditor") {
+      return <span className="role-chip auditor">🛡️ Compliance Auditor (Read-Only)</span>;
+    }
+    return <span className="role-chip analyst">📊 Analyst (Query & Ingest)</span>;
+  };
+
   return (
     <div className="vault-screen-canvas">
       {/* Vault Header Banner */}
       <div className="screen-header-banner">
         <div>
-          <h2 className="screen-title">Partitioned Knowledge Vault</h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+            <h2 className="screen-title" style={{ margin: 0 }}>
+              {user?.role === "admin" ? "Partitioned Knowledge Vault" : "My Private Knowledge Vault"}
+            </h2>
+            {getRoleBadge()}
+          </div>
           <p className="screen-desc">
-            Isolated enterprise data room for <strong>{activeTenant}</strong>. Uploaded files are chunked, densely vector-indexed, and sparse-lexical indexed for hybrid retrieval.
+            {user?.role === "admin" ? (
+              <>Enterprise partition: <strong>{activeTenant}</strong>. Admins can inspect partitions and manage indexed knowledge.</>
+            ) : (
+              <>Private isolated workspace for <strong>{user?.name || "your account"}</strong> ({activeTenant}). Other users and tenants cannot access or query these files.</>
+            )}
           </p>
         </div>
         <div className="screen-stats-badge">
@@ -1207,40 +1285,58 @@ function VaultScreen({
         </div>
       </div>
 
-      {/* Drag & Drop Upload Zone */}
-      <div
-        className="upload-dropzone-card"
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: "none" }}
-          onChange={handleFileChange}
-          accept=".pdf,.txt,.md,.json"
-        />
-        <div className="dropzone-icon">📁</div>
-        <div className="dropzone-text-main">Click to upload contract or data filing</div>
-        <div className="dropzone-subtext">Supports PDF, Markdown, Text, and JSON (automatic chunking & metadata extraction)</div>
-
-        {uploadStatus && (
-          <div className={`upload-status-bar ${uploadStatus.error ? "error" : "success"}`}>
-            {uploadStatus.text}
+      {/* Upload Zone / Read-Only Notice */}
+      {canIngest ? (
+        <div
+          className="upload-dropzone-card"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+            accept=".pdf,.txt,.md,.json"
+          />
+          <div className="dropzone-icon">📁</div>
+          <div className="dropzone-text-main">Click to upload contract, document, or book file</div>
+          <div className="dropzone-subtext">
+            Supports PDF, Markdown, Text, and JSON (automatically chunked & isolated strictly to your workspace)
           </div>
-        )}
-      </div>
+
+          {uploadStatus && (
+            <div className={`upload-status-bar ${uploadStatus.error ? "error" : "success"}`}>
+              {uploadStatus.text}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="upload-dropzone-card readonly-audit-mode" title="Auditor accounts are restricted to read-only compliance inspection">
+          <div className="dropzone-icon">🛡️</div>
+          <div className="dropzone-text-main">SOC-2 Read-Only Compliance Mode</div>
+          <div className="dropzone-subtext">
+            Document upload and partition modifications are disabled under the Auditor role.
+          </div>
+        </div>
+      )}
 
       {/* Document Grid */}
       <div className="vault-docs-section">
-        <h3 className="section-title">Active Partition Documents</h3>
+        <h3 className="section-title">
+          {user?.role === "admin" ? `Active Partition Documents (${activeTenant})` : "My Isolated Documents"}
+        </h3>
 
         {loading ? (
           <div className="loading-state-card">Loading vault index...</div>
         ) : vaultDocs.length === 0 ? (
           <div className="empty-vault-card">
             <span className="empty-icon">📭</span>
-            <div className="empty-title">No documents in this partition yet</div>
-            <div className="empty-desc">Upload sample contracts or financial filings above to enable grounded answers.</div>
+            <div className="empty-title">No documents in your workspace yet</div>
+            <div className="empty-desc">
+              {canIngest
+                ? "Upload your books, PDFs, or contracts above. Only you will be able to query them."
+                : "This workspace is currently empty."}
+            </div>
           </div>
         ) : (
           <div className="docs-cards-grid">
@@ -1251,7 +1347,7 @@ function VaultScreen({
                   <div className="doc-name-group">
                     <div className="doc-filename" title={doc.filename}>{doc.filename}</div>
                     <div className="doc-meta-sub">
-                      {doc.chunk_count || 1} chunks • {doc.size_bytes ? Math.round(doc.size_bytes / 1024) + " KB" : "Indexed"}
+                      {doc.chunk_count || 1} chunks • {doc.total_characters ? `${Math.round(doc.total_characters / 1000)}k chars` : "Indexed"}
                     </div>
                   </div>
                 </div>
@@ -1264,13 +1360,20 @@ function VaultScreen({
                   >
                     👁️ Inspect & Highlight
                   </button>
-                  <button
-                    className="doc-action-btn delete"
-                    onClick={() => onDelete(doc.filename)}
-                    title="Delete from partition"
-                  >
-                    🗑️ Remove
-                  </button>
+
+                  {canDelete ? (
+                    <button
+                      className="doc-action-btn delete"
+                      onClick={() => onDelete(doc.filename)}
+                      title="Delete from partition"
+                    >
+                      🗑️ Remove
+                    </button>
+                  ) : (
+                    <div className="doc-protected-badge" title="Deletion restricted to Administrator role">
+                      🔒 Protected
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -1280,6 +1383,7 @@ function VaultScreen({
     </div>
   );
 }
+
 
 /* --- SOURCE: DiffMatrixScreen.jsx --- */
 
@@ -2419,6 +2523,7 @@ function AppShell() {
               onDelete={vault.deleteFile}
               onOpenVisualizer={setVisualizerTarget}
               activeTenant={auth.activeTenant}
+              user={auth.user}
             />
           )}
 

@@ -6,6 +6,15 @@
 
 const BASE_URL = "";
 
+function getAuthHeaders(extraHeaders = {}) {
+  const token = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("axiom_token") : null;
+  const headers = { ...extraHeaders };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export const api = {
   // ---------------------------------------------------------------------------
   // AUTHENTICATION & USER PROFILE
@@ -33,7 +42,7 @@ export const api = {
         password,
         role: role || "analyst",
         title: title || "Enterprise User",
-        default_tenant: default_tenant || "default_tenant",
+        default_tenant: default_tenant || null,
       }),
     });
     if (!res.ok) {
@@ -45,7 +54,7 @@ export const api = {
 
   async getProfile(token) {
     const res = await fetch(`${BASE_URL}/api/v1/auth/me?token=${encodeURIComponent(token || "")}`, {
-      headers: { Authorization: `Bearer ${token || ""}` },
+      headers: getAuthHeaders({ Authorization: `Bearer ${token || ""}` }),
     });
     if (!res.ok) throw new Error("Failed to fetch user profile");
     return res.json();
@@ -54,10 +63,10 @@ export const api = {
   async updateProfile(token, profileData) {
     const res = await fetch(`${BASE_URL}/api/v1/auth/me?token=${encodeURIComponent(token || "")}`, {
       method: "PUT",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json",
         Authorization: `Bearer ${token || ""}`,
-      },
+      }),
       body: JSON.stringify(profileData),
     });
     if (!res.ok) {
@@ -70,10 +79,10 @@ export const api = {
   async changePassword(token, currentPassword, newPassword) {
     const res = await fetch(`${BASE_URL}/api/v1/auth/change-password?token=${encodeURIComponent(token || "")}`, {
       method: "POST",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json",
         Authorization: `Bearer ${token || ""}`,
-      },
+      }),
       body: JSON.stringify({
         current_password: currentPassword,
         new_password: newPassword,
@@ -93,10 +102,10 @@ export const api = {
     try {
       const res = await fetch(`${BASE_URL}/api/v1/query/stream`, {
         method: "POST",
-        headers: {
+        headers: getAuthHeaders({
           "Content-Type": "application/json",
           "X-Axiom-Provider": provider,
-        },
+        }),
         body: JSON.stringify({
           query,
           tenant_id: tenantId || "default_tenant",
@@ -174,7 +183,9 @@ export const api = {
   // KNOWLEDGE VAULT & DOCUMENTS
   // ---------------------------------------------------------------------------
   async getVaultDocuments(tenantId) {
-    const res = await fetch(`${BASE_URL}/api/v1/documents?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`);
+    const res = await fetch(`${BASE_URL}/api/v1/documents?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error("Failed to load vault documents");
     return res.json();
   },
@@ -186,6 +197,7 @@ export const api = {
 
     const res = await fetch(`${BASE_URL}/api/v1/ingest/file`, {
       method: "POST",
+      headers: getAuthHeaders(),
       body: formData,
     });
     if (!res.ok) {
@@ -198,16 +210,24 @@ export const api = {
   async deleteDocument(filename, tenantId) {
     const res = await fetch(`${BASE_URL}/api/v1/documents/${encodeURIComponent(filename)}?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
       method: "DELETE",
+      headers: getAuthHeaders(),
     });
-    if (!res.ok) throw new Error("Failed to delete document");
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || "Failed to delete document");
+    }
     return res.json();
   },
 
-  async viewDocument(filename) {
-    const res = await fetch(`${BASE_URL}/api/v1/documents/${encodeURIComponent(filename)}/view`);
+  async viewDocument(filename, tenantId) {
+    const t = tenantId ? `?tenant_id=${encodeURIComponent(tenantId)}` : "";
+    const res = await fetch(`${BASE_URL}/api/v1/documents/${encodeURIComponent(filename)}/view${t}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) throw new Error("Document view unavailable");
     return res.json();
   },
+
 
   // ---------------------------------------------------------------------------
   // CONTRACT CONTRADICTION & DIFF
@@ -263,18 +283,25 @@ export const api = {
   // SESSIONS, AUDIT & EXPORT
   // ---------------------------------------------------------------------------
   async getSessions(tenantId) {
-    const res = await fetch(`${BASE_URL}/api/v1/sessions?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`);
+    const res = await fetch(`${BASE_URL}/api/v1/sessions?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) return [];
     return res.json();
   },
 
   async deleteSession(sessionId) {
-    const res = await fetch(`${BASE_URL}/api/v1/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });
+    const res = await fetch(`${BASE_URL}/api/v1/sessions/${encodeURIComponent(sessionId)}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
     return res.ok;
   },
 
   async getAuditHistory(tenantId) {
-    const res = await fetch(`${BASE_URL}/api/v1/history/audit?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`);
+    const res = await fetch(`${BASE_URL}/api/v1/history/audit?tenant_id=${encodeURIComponent(tenantId || "default_tenant")}`, {
+      headers: getAuthHeaders(),
+    });
     if (!res.ok) return { records: [], total: 0 };
     return res.json();
   },
@@ -286,7 +313,7 @@ export const api = {
 
     const res = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         query,
         generation,

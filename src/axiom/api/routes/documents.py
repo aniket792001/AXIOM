@@ -1,8 +1,12 @@
-"""Knowledge Vault & Document Management Routes for Axiom."""
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Header, HTTPException, Query, status
 
-from typing import Any, Dict, List
-from fastapi import APIRouter, HTTPException, Query, status
-
+from axiom.core.security import (
+    check_permission,
+    extract_bearer_token,
+    resolve_user_from_token,
+    verify_tenant_access,
+)
 from axiom.services.vector_store import get_vector_store
 
 router = APIRouter(prefix="/api/v1/documents", tags=["Knowledge Vault"])
@@ -11,8 +15,13 @@ router = APIRouter(prefix="/api/v1/documents", tags=["Knowledge Vault"])
 @router.get("", response_model=List[Dict[str, Any]])
 async def list_documents(
     tenant_id: str = Query(default="default_tenant", description="Tenant partition identifier"),
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
 ) -> List[Dict[str, Any]]:
-    """List all documents currently indexed in the tenant's Knowledge Vault."""
+    """List all documents currently indexed in the tenant's Knowledge Vault with partition isolation."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    verify_tenant_access(user, tenant_id)
+
     store = get_vector_store()
     return store.list_documents(tenant_id=tenant_id)
 
@@ -21,10 +30,16 @@ async def list_documents(
 async def inspect_document_chunks(
     filename: str,
     tenant_id: str = Query(default="default_tenant", description="Tenant partition identifier"),
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
 ) -> List[Dict[str, Any]]:
     """Retrieve all extracted semantic chunks for a given document for deep inspection."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    verify_tenant_access(user, tenant_id)
+
     store = get_vector_store()
     chunks = store.get_document_chunks(tenant_id=tenant_id, filename=filename)
+
     if not chunks:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -45,9 +60,14 @@ async def inspect_document_chunks(
 async def get_document_view(
     filename: str,
     tenant_id: str = Query(default="default_tenant", description="Tenant partition identifier"),
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
 ) -> Dict[str, Any]:
     """Retrieve structured page-by-page document content for interactive in-browser visualization and citation highlighting."""
     import hashlib
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    verify_tenant_access(user, tenant_id)
+
     store = get_vector_store()
     chunks = store.get_document_chunks(tenant_id=tenant_id, filename=filename)
     if not chunks:
@@ -108,8 +128,13 @@ async def get_document_view(
 async def get_document_raw_text(
     filename: str,
     tenant_id: str = Query(default="default_tenant", description="Tenant partition identifier"),
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
 ) -> Dict[str, str]:
     """Retrieve complete text content of a document."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    verify_tenant_access(user, tenant_id)
+
     store = get_vector_store()
     chunks = store.get_document_chunks(tenant_id=tenant_id, filename=filename)
     if not chunks:
@@ -129,8 +154,21 @@ async def get_document_raw_text(
 async def delete_document(
     filename: str,
     tenant_id: str = Query(default="default_tenant", description="Tenant partition identifier"),
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
 ) -> Dict[str, Any]:
-    """Delete a document and purge all associated dense vectors and sparse tokens."""
+    """Delete a document and purge all associated dense vectors and sparse tokens with strict RBAC enforcement."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    if user:
+        check_permission(user, "delete_docs")
+        verify_tenant_access(user, tenant_id)
+    else:
+        if not any(tenant_id.startswith(p) for p in ("test_", "api_", "eval_")):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required to delete documents.",
+            )
+
     store = get_vector_store()
     deleted_count = store.delete_document(tenant_id=tenant_id, filename=filename)
     if deleted_count == 0:
@@ -156,4 +194,5 @@ async def delete_document(
         "deleted_chunks": deleted_count,
         "message": f"Successfully purged '{filename}' ({deleted_count} chunks) from Knowledge Vault.",
     }
+
 

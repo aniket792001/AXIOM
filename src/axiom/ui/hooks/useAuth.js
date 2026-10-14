@@ -134,11 +134,19 @@ export function useAuth() {
     }
   }, [token]);
 
+  const updateActiveTenant = useCallback((newTenant) => {
+    if (user && user.role !== "admin") {
+      // Non-admins are strictly isolated to their own workspace
+      return;
+    }
+    setActiveTenant(newTenant);
+  }, [user]);
+
   return {
     user,
     token,
     activeTenant,
-    setActiveTenant,
+    setActiveTenant: updateActiveTenant,
     loading,
     error,
     login,
@@ -148,3 +156,4 @@ export function useAuth() {
     changePassword,
   };
 }
+

@@ -127,6 +127,7 @@ export function AppShell() {
               onDelete={vault.deleteFile}
               onOpenVisualizer={setVisualizerTarget}
               activeTenant={auth.activeTenant}
+              user={auth.user}
             />
           )}
 

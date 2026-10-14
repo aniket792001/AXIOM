@@ -1,7 +1,12 @@
-"""Document Ingestion Routes for Axiom API Gateway."""
-
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from typing import Optional
+from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile, status
 from axiom.api.schemas.ingest import IngestRequest, IngestResponse
+from axiom.core.security import (
+    check_permission,
+    extract_bearer_token,
+    resolve_user_from_token,
+    verify_tenant_access,
+)
 from axiom.services.document_loader import process_document
 from axiom.services.vector_store import get_vector_store
 
@@ -9,8 +14,17 @@ router = APIRouter(prefix="/api/v1", tags=["Ingestion"])
 
 
 @router.post("/ingest", response_model=IngestResponse, status_code=status.HTTP_201_CREATED)
-async def ingest_documents(payload: IngestRequest) -> IngestResponse:
+async def ingest_documents(
+    payload: IngestRequest,
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+) -> IngestResponse:
     """Ingest document chunks into both dense vector store and sparse BM25 index with tenant isolation."""
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    if user:
+        check_permission(user, "ingest")
+        verify_tenant_access(user, payload.tenant_id)
+
     if not payload.documents:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -33,12 +47,19 @@ async def ingest_file(
     tenant_id: str = Form("default_tenant", description="Target tenant ID for partition isolation"),
     chunk_size: int = Form(800, description="Chunk target character size"),
     chunk_overlap: int = Form(150, description="Overlap between consecutive chunks"),
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Form(None),
 ) -> dict:
     """Upload and index a complete document or book file (PDF, TXT, Markdown).
 
     Automatically parses pages, generates semantically coherent chunks,
     and indexes them into Axiom's hybrid vector store.
     """
+    user = resolve_user_from_token(extract_bearer_token(authorization, token))
+    if user:
+        check_permission(user, "ingest")
+        verify_tenant_access(user, tenant_id)
+
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -82,6 +103,7 @@ async def ingest_file(
         from axiom.db.models import DocumentMetadata
 
         total_chars = sum(len(c.content) for c in chunks)
+        uploader = user.get("email", "anonymous") if user else "anonymous"
         with SessionLocal() as db:
             doc_meta = db.query(DocumentMetadata).filter_by(tenant_id=tenant_id, filename=file.filename).first()
             if not doc_meta:
@@ -90,14 +112,17 @@ async def ingest_file(
                     filename=file.filename,
                     chunk_count=count,
                     char_count=total_chars,
+                    uploaded_by=uploader,
                     uploaded_at=datetime.utcnow(),
                 )
                 db.add(doc_meta)
             else:
                 doc_meta.chunk_count = count
                 doc_meta.char_count = total_chars
+                doc_meta.uploaded_by = uploader
                 doc_meta.uploaded_at = datetime.utcnow()
             db.commit()
+
     except Exception as exc:
         print(f"[!] Failed to persist document metadata to DB: {exc}")
 

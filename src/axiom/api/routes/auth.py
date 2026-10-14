@@ -8,9 +8,14 @@ from fastapi import APIRouter, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from axiom.core.security import (
+    ROLE_PERMISSIONS,
+    _SESSIONS_DB,
     create_access_token,
     decode_access_token,
+    extract_bearer_token,
+    get_user_workspace,
     hash_password,
+    resolve_user_from_token,
     verify_password,
 )
 from axiom.db.database import SessionLocal
@@ -18,12 +23,6 @@ from axiom.db.models import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication & RBAC"])
 
-# Predefined Enterprise Roles and Permissions
-ROLE_PERMISSIONS: Dict[str, List[str]] = {
-    "admin": ["query", "ingest", "delete_docs", "manage_keys", "export_cert", "view_audit", "manage_users"],
-    "analyst": ["query", "ingest", "export_cert"],
-    "auditor": ["query", "export_cert", "view_audit"],
-}
 
 DEMO_USERS = {
     "admin@axiom.ai": {
@@ -55,8 +54,8 @@ DEMO_USERS = {
     },
 }
 
-# Active Session Token Cache
-_SESSIONS_DB: Dict[str, Dict[str, Any]] = {}
+_extract_token = extract_bearer_token
+_get_user_by_token = resolve_user_from_token
 
 
 class LoginRequest(BaseModel):
@@ -73,7 +72,7 @@ class RegisterRequest(BaseModel):
     password: Optional[str] = Field(default="", description="Account password (min 6 characters)")
     role: str = Field(default="analyst", description="Role: admin, analyst, auditor")
     title: Optional[str] = Field(default="Enterprise User", description="Job title")
-    default_tenant: Optional[str] = Field(default="default_tenant", description="Default tenant data room")
+    default_tenant: Optional[str] = Field(default=None, description="Default tenant data room")
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -97,35 +96,6 @@ class LoginResponse(BaseModel):
     tenant_id: str
     status: str = "authenticated"
 
-
-def _extract_token(
-    authorization: Optional[str] = None,
-    query_token: Optional[str] = None,
-) -> Optional[str]:
-    """Helper to extract token from Authorization header or query param."""
-    if authorization and authorization.lower().startswith("bearer "):
-        return authorization[7:].strip()
-    return query_token
-
-
-def _get_user_by_token(token: Optional[str]) -> Optional[Dict[str, Any]]:
-    """Resolve user profile from JWT claims or session cache."""
-    if not token:
-        return None
-    # 1. Check in-memory cache
-    if token in _SESSIONS_DB:
-        return _SESSIONS_DB[token]["user"]
-    # 2. Decode JWT claims
-    claims = decode_access_token(token)
-    if claims and "sub" in claims:
-        email = claims["sub"]
-        with SessionLocal() as db:
-            db_user = db.query(User).filter_by(email=email).first()
-            if db_user:
-                user_dict = db_user.to_dict()
-                user_dict["permissions"] = ROLE_PERMISSIONS.get(db_user.role, ROLE_PERMISSIONS["analyst"])
-                return user_dict
-    return None
 
 
 @router.post("/login", response_model=LoginResponse)
@@ -155,6 +125,9 @@ async def login(payload: LoginRequest) -> LoginResponse:
 
         # Update or create user record in SQLite DB
         if db_user:
+            # If user has shared demo room as default and is not a demo account, migrate to isolated workspace
+            if db_user.email not in DEMO_USERS and db_user.default_tenant in ["default_tenant", "legal_contracts", "financial_filings"]:
+                db_user.default_tenant = get_user_workspace(db_user.email)
             db_user.last_login = datetime.now(timezone.utc)
             db.commit()
             db.refresh(db_user)
@@ -164,7 +137,7 @@ async def login(payload: LoginRequest) -> LoginResponse:
             # Create dynamic user
             new_role = (user_record.get("role") if user_record else payload.role) or "analyst"
             new_title = (user_record.get("title") if user_record else "Enterprise Team Member")
-            new_tenant = (user_record.get("default_tenant") if user_record else "default_tenant")
+            new_tenant = (user_record.get("default_tenant") if user_record else get_user_workspace(email))
             new_avatar = (user_record.get("avatar") if user_record else email[:2].upper())
             new_name = (user_record.get("name") if user_record else email.split("@")[0].capitalize())
 
@@ -195,6 +168,7 @@ async def login(payload: LoginRequest) -> LoginResponse:
         "role": user_profile["role"],
         "name": user_profile["name"],
         "tenant_id": user_profile["default_tenant"],
+        "permissions": user_profile["permissions"],
     })
 
     # Cache session
@@ -226,12 +200,18 @@ async def register_user(payload: RegisterRequest) -> Dict[str, Any]:
                 detail=f"User with email '{email}' already registered.",
             )
 
+        assigned_tenant = (
+            payload.default_tenant.strip()
+            if payload.default_tenant and payload.default_tenant not in ["default_tenant", "legal_contracts", "financial_filings"]
+            else get_user_workspace(email)
+        )
+
         new_user = User(
             email=email,
             name=payload.name.strip(),
             role=payload.role or "analyst",
             title=payload.title or "Enterprise User",
-            default_tenant=payload.default_tenant or "default_tenant",
+            default_tenant=assigned_tenant,
             avatar=payload.name[:2].upper() if payload.name else email[:2].upper(),
             is_active=True,
             last_login=datetime.now(timezone.utc),
@@ -247,6 +227,7 @@ async def register_user(payload: RegisterRequest) -> Dict[str, Any]:
 
         user_data = new_user.to_dict()
         user_data["permissions"] = ROLE_PERMISSIONS.get(new_user.role, ROLE_PERMISSIONS["analyst"])
+
 
         # Create instant JWT token
         token = create_access_token({

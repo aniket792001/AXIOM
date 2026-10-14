@@ -37,15 +37,28 @@ export function Header({
         {/* Tenant Partition Selector */}
         <div className="tenant-badge-selector">
           <span className="tenant-icon">🏢</span>
-          <select
-            className="tenant-select"
-            value={activeTenant}
-            onChange={(e) => setActiveTenant(e.target.value)}
-          >
-            <option value="default_tenant">Master Enterprise Vault</option>
-            <option value="legal_contracts">Legal & Compliance Vault</option>
-            <option value="financial_filings">Financial Filings (10-K/10-Q)</option>
-          </select>
+          {user?.role === "admin" ? (
+            <select
+              className="tenant-select"
+              value={activeTenant}
+              onChange={(e) => setActiveTenant(e.target.value)}
+              title="Administrator Cross-Tenant Partition Selector"
+            >
+              <option value={user?.default_tenant || "default_tenant"}>
+                👤 My Private Workspace ({user?.name ? user.name.split(" ")[0] : "Admin"})
+              </option>
+              <option value="default_tenant">Master Enterprise Vault (Demo)</option>
+              <option value="legal_contracts">Legal & Compliance Vault (Demo)</option>
+              <option value="financial_filings">Financial Filings (Demo)</option>
+            </select>
+          ) : (
+            <div className="tenant-locked-badge" title="Isolated Workspace: Access strictly restricted to your private data room">
+              <span className="locked-icon">🔒</span>
+              <span className="locked-tenant-name">
+                {user?.name ? `${user.name.split(" ")[0]}'s Vault` : "My Workspace"} (Isolated)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Model Provider */}
